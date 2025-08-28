@@ -1,0 +1,13 @@
+openapi: 3.0.1
+info:
+  title: library-schema
+  description: ''
+  version: '1.0'
+servers:
+  - url: 
+paths:
+ 
+components:
+ 
+security:
+

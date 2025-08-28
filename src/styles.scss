@@ -1,0 +1,171 @@
+@import "@angular/material/prebuilt-themes/indigo-pink.css";
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+html, body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  justify-content: center;
+  align-items: center;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #019DF4 #F6F6F6;
+}
+
+/* Chrome, Edge, and Safari */
+*::-webkit-scrollbar {
+  width: 5px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #F6F6F6;
+  border-radius: 5px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #019DF4;
+  border-radius: 14px;
+  border: 3px solid var(--primary);
+}
+
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: "telefonicabrand";
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+  src: url(assets/fonts/brand/normal/bold/Telefonica-Bold.otf) format("truetype"),
+  url(assets/fonts/brand/normal/bold/Telefonica-Bold.woff2) format("woff2"),
+  url(assets/fonts/brand/normal/bold/Telefonica-Bold.woff) format("woff");
+}
+
+@font-face {
+  font-family: "telefonicabrand";
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+  src: url(assets/fonts/brand/normal/extralight/Telefonica-ExtraLight.otf) format("truetype"),
+  url(assets/fonts/brand/normal/extralight/Telefonica-ExtraLight.woff2) format("woff2"),
+  url(assets/fonts/brand/normal/extralight/Telefonica-ExtraLight.woff) format("woff");
+}
+
+@font-face {
+  font-family: "telefonicabrand";
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+  src: url(assets/fonts/brand/normal/light/Telefonica-Light.otf) format("truetype"),
+  url(assets/fonts/brand/normal/light/Telefonica-Light.woff2) format("woff2"),
+  url(assets/fonts/brand/normal/light/Telefonica-Light.woff) format("woff");
+}
+
+@font-face {
+  font-family: "telefonicabrand";
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+  src: url(assets/fonts/brand/normal/regular/Telefonica-Regular.otf) format("truetype"),
+  url(assets/fonts/brand/normal/regular/Telefonica-Regular.woff2) format("woff2"),
+  url(assets/fonts/brand/normal/regular/Telefonica-Regular.woff) format("woff");
+}
+
+@font-face {
+  font-family: "telefonicabrand";
+  font-weight: normal;
+  font-style: italic;
+  font-display: swap;
+  src: url(assets/fonts/brand/normal/regularitalic/Telefonica-RegularItalic.otf) format("truetype"),
+  url(assets/fonts/brand/normal/regularitalic/Telefonica-RegularItalic.woff2) format("woff2"),
+  url(assets/fonts/brand/normal/regularitalic/Telefonica-RegularItalic.woff) format("woff");
+}
+
+@font-face {
+  font-family: "telefonicabrandcap";
+  font-weight: normal;
+  font-style: italic;
+  font-display: swap;
+  src: url(assets/fonts/brand/cap/regular/TelefonicaCap-Regular.otf) format("truetype"),
+  url(assets/fonts/brand/cap/regular/TelefonicaCap-Regular.woff2) format("woff2"),
+  url(assets/fonts/brand/cap/regular/TelefonicaCap-Regular.woff) format("woff");
+}
+
+
+@layer base {
+  html {
+    font-family: telefonicabrand, serif
+  }
+}
+
+@layer components {
+  .btn_primary_global {
+    @apply hover:bg-blue-300 text-blue-300 font-bold hover:text-white w-full h-full py-2.5 border border-blue-300 rounded shadow-lg;
+  }
+
+  .btn_secondary_disable_global {
+    @apply text-gray-300 font-bold w-full h-full py-2.5 border border-gray-300 rounded shadow-lg;
+  }
+
+  .btn_secondary_global {
+    @apply hover:bg-magenta-300 text-magenta-300 font-bold hover:text-white w-full h-full py-2.5 border border-magenta-300 rounded;
+  }
+
+  .label_global {
+    @apply block mb-2 text-sm text-blue-600;
+  }
+
+  .input_global {
+    @apply shadow-lg text-sm rounded-lg block w-full p-2.5 hover:border-blue-300
+    bg-gray-100 border border-gray-200 text-blue-600 text-sm w-full p-2.5 outline-blue-300;
+  }
+
+  .input_disable_global {
+    @apply shadow-lg text-blue-600 text-sm rounded-lg block w-full p-2.5 hover:border-blue-300 bg-gray-200;
+  }
+
+  .hr_global {
+    @apply my-2 h-px bg-gray-200 border-0 col-span-12;
+  }
+
+  .checkbox-global {
+    @apply w-4 h-4 border-gray-300 focus:ring-2 focus:ring-blue-600;
+  }
+
+  .checkbox-content-global {
+    @apply flex items-center w-full p-2.5 rounded-lg border border-gray-200 bg-gray-100 hover:border-blue-300 shadow-lg;
+  }
+
+  .toggle-global {
+    @apply w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer-checked:after:translate-x-full
+    peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px]
+    after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all
+    peer-checked:bg-blue-300;
+  }
+
+  .dropdown-global {
+    @apply text-blue-600 text-sm bg-gray-100 w-full p-2.5 hover:border-blue-300 focus:ring-4 focus:outline-none focus:ring-blue-300
+    rounded-lg text-sm px-4 py-2.5 text-center inline-flex items-center;
+  }
+
+  .snackbarClassWarning {
+    @apply bg-yellow-300 text-white
+  }
+
+  .snackbarClassDanger {
+    @apply bg-magenta-300 text-white
+  }
+
+  .snackbarClassSuccess {
+    @apply bg-blue-300 text-white
+  }
+}

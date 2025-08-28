@@ -1,0 +1,53 @@
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: library-schema
+  description: Repositorio que contiene la libreria para crear esquemas de red y su logica
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+  links:
+    - url: https://dev.azure.com/CelulaSoporteCasaCliente/DanosMasivos/_git/library-schema?ref=test
+      title: library-schema
+  tags:
+    - segmento-convergente
+    - producto-fijo
+    - dom-funcional-aprovisionamiento
+    - integration-reuso-con-aprobacion
+    - lenguaje-typescript
+spec:
+  type: openapi
+  owner: CelulaSoporteCasaCliente
+  lifecycle: production
+  system: system:default/aks
+  definition:
+    $text: /docs/openapi.yaml
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: library-schema
+  description: Repositorio que contiene la libreria para crear esquemas de red y su logica
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+  links:
+    - url: https://dev.azure.com/CelulaSoporteCasaCliente/DanosMasivos/_git/library-schema?ref=test
+      title: library-schema
+  tags:
+    - segmento:convergente
+    - producto:fijo
+    - dom-funcional:aprovisionamiento
+    - integration:reuso-con-aprobacion
+    - lenguaje:typescript
+spec:
+  type: service
+  owner: CelulaSoporteCasaCliente
+  lifecycle: production
+  system: system:default/aks
+  dependsOn:
+    - component:default/gestiondanosmasivos
+  providesApis:
+    - library-schema
+  apiConsumedBy:
+    - component:default/gestiondanosmasivos
+  consumesApis:
+    - component:default/gestiondanosmasivos

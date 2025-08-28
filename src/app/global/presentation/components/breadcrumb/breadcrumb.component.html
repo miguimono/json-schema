@@ -1,0 +1,9 @@
+<div class="w-full bg-currentColor h-12 flex items-center px-2 md:px-0 space-x-2 overflow-x-auto scroll-smooth">
+
+    <div class="min-w-fit px-4 cursor-pointer flex items-center bg-blue-300 rounded-tl-lg rounded-bl-lg rounded-tr-full rounded-br-full justify-center h-8"
+      [class]="item.isActive?'bg-blue-300 text-white':'bg-white text-blue-300'" *ngFor="let item of historical"
+      [routerLink]="[item.route]">
+      {{item.name | titlecase}}
+    </div>
+
+</div>

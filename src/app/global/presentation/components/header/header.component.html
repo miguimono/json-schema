@@ -1,0 +1,34 @@
+<nav class="w-full bg-currentColor h-12 flex items-center md:hidden">
+
+  <div class="flex text-secondaryColor py-1 rounded-lg h-full justify-between items-center w-full px-2">
+
+
+    <div class="w-auto h-full cursor-pointer">
+      <app-svg-importer classes="fill-blue-300 w-12 h-12" [iconName]="'movistar-icon'"></app-svg-importer>
+    </div>
+    <div class="w-auto h-full cursor-pointer" (click)="handleMenu()">
+      <app-svg-importer classes="fill-blue-300 w-10 h-10" [iconName]="'menu-icon'"></app-svg-importer>
+    </div>
+
+  </div>
+
+</nav>
+<div class="absolute top-0 left-0 bg-currentColor w-full h-screen flex flex-col md:hidden" [class]="isOpen?'visible':'hidden'">
+  <button class="w-full h-12 flex items-center justify-end px-2 cursor-pointer">
+    <app-svg-importer (click)="handleMenu()" classes="fill-blue-300 w-10 h-10" [iconName]="'close-icon'"></app-svg-importer>
+  </button>
+  <div class="flex flex-col w-auto mx-auto pb-4">
+    <a *ngFor="let item of opcionesMenu" (click)="handleMenu();" class="fill-blue-300 text-blue-300 hover:bg-gray-200 flex items-center w-full h-12 px-3 mt-2 rounded-xl hover:bg-indigo-700"
+    [routerLinkActive]="['bg-secondaryColor', '!text-white', '!fill-white']"
+    [routerLink]="[item.route]">
+      <app-svg-importer  classes="w-4 h-4" [iconName]="item.icon"></app-svg-importer>
+      <span class="ml-2 text-sm font-medium">{{item.name}}</span>
+    </a>
+  </div>
+  <div class="flex flex-col items-center w-full px-3 mt-2 justify-end text-center h-full space-y-1 py-2">
+    <span class="text-center ml-2 text-sm font-bold text-secondaryColor cursor-pointer" (click)="logoutWithAD()">Cerrar sesión</span>
+    <span class="text-center ml-2 text-xs font-extralight text-gray-400">© {{year}} Telefonica, All Rights Reserved</span>
+    <span class="text-center ml-2 text-xs font-extralight text-gray-400">Version 1.0.0</span>
+  </div>
+</div>
+

@@ -1,0 +1,53 @@
+<form [formGroup]="calculatorForm" (ngSubmit)="calculate()">
+  <div class="grid grid-cols-12 gap-5 w-100">
+    <div class="col-span-12 text-center my-4">
+      <label class="label_global text-lg">Paso A Calculadora<em class="text-magenta-300">*</em></label>
+      <hr class="hr_global">
+    </div>
+
+    <div class="md:col-span-6 col-span-12">
+      <label for="renova" class="label_global">VALOR CON IVA SCL O RENOVA:</label>
+      <input type="text" id="renova" class="input_global" placeholder="SCL o RENOVA"
+             formControlName="valueSCLorRenova"
+             oninput="this.value=this.value.replace(/\D/g,'')" required>
+      <div class="block mt-2" *ngIf="idValueSCLorRenova?.touched && idValueSCLorRenova?.value == 0">
+        <p class="text-magenta-300">Este Campo Es Obligatorio</p>
+      </div>
+    </div>
+
+    <div class="md:col-span-6 col-span-12">
+      <label for="iva_pay" class="label_global">VALOR CON IVA A PAGAR POR CLIENTE:</label>
+      <div class="flex w-full">
+        <input type="text" id="iva_pay" class="input_global" placeholder="valor con iva a pagar por el cliente"
+               oninput="this.value=this.value.replace(/\D/g,'')" formControlName="valuePayClient" required>
+        <div class="flex items-end w-full md:w-auto justify-end">
+          <div class="px-2 w-full flex items-center h-full">
+            <input type="button" class="btn_primary_global px-3 py-0 text-md h-full" value="Calcular"
+                   (click)="calculate()">
+          </div>
+        </div>
+      </div>
+      <div class="block mt-2" *ngIf="idValuePayClient?.touched && idValuePayClient?.value == 0">
+        <p class="text-magenta-300">Este Campo Es Obligatorio</p>
+      </div>
+    </div>
+
+    <div class="md:col-span-6 col-span-12">
+      <label class="label_global">PORCENTAJE SCL<em class="text-magenta-300">*</em></label>
+      <input class="input_disable_global" formControlName="percentageSCL"
+             value="{{idPercentageSCL?.value + '%' }}">
+      <div class="block mt-2" *ngIf="idPercentageSCL?.touched && idPercentageSCL?.value == 0">
+        <p class="text-magenta-300">Este Campo Es Obligatorio</p>
+      </div>
+    </div>
+
+    <div class="md:col-span-6 col-span-12">
+      <label class="label_global">VALOR DE EQUIPO<em class="text-magenta-300">*</em></label>
+      <input class="input_disable_global" formControlName="equipmentValue"
+             value="{{idEquipment?.value | currency:'COP ':'symbol'}}">
+      <div class="block mt-2" *ngIf="idEquipment?.touched && idEquipment?.value == ''">
+        <p class="text-magenta-300">Este Campo Es Obligatorio</p>
+      </div>
+    </div>
+  </div>
+</form>
