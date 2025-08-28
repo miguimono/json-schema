@@ -8,4 +8,4 @@
 # Exportar
   npm run build -> Aumenta version de "projects/schema/package.json"
   cd dist/schema/
-  npm pack -> Genera esquema exportable "dist/schema/schema-0.0.1.tgz"
+  npm pack -> Genera esquema exportable "dist/schema/telefonica-schema-0.0.1.tgz"
