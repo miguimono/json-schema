@@ -1,6 +1,9 @@
 /*
- * Public API Surface of schema
+ * Public API Surface of scheme
  */
 
-export * from './lib/schema.service';
-export * from './lib/schema.component';
+export * from './lib/models';
+export * from './lib/components/schema/schema.component';
+export * from './lib/components/schema-card/scheme-card.component';
+export * from './lib/services/schema-layout.service';
+export * from './lib/services/json-adapter.service';

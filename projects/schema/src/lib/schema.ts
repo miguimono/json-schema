@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 
 @Component({
-  selector: 'sh-schema',
+  selector: 'schema',
   imports: [],
   template: `
     <p>
@@ -10,6 +10,6 @@ import { Component } from '@angular/core';
   `,
   styles: ``
 })
-export class SchemaComponent {
+export class ShSchema {
 
 }
