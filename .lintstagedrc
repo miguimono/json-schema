@@ -1,7 +1,0 @@
-{
-  "*.{js,ts}": "prettier --write",
-  "*.scss": "prettier --write",
-  "*.html": "prettier --write",
-  "*.md": "prettier --write",
-  "!(package-lock.json)*.json": "prettier --write"
-}

@@ -1,9 +1,0 @@
-site_name: 'library-schema'
-
-nav:
-  - index.md: index.md
-  - 01.-Descripcion-General-de-la-Integracion.md: 01.-Descripcion-General-de-la-Integracion.md
-  - 02.-DF_DT-Operacion-nombre.md: 02.-DF_DT-Operacion-nombre.md
-
-plugins:
-  - techdocs-core
