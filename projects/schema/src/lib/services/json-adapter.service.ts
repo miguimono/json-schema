@@ -213,7 +213,7 @@ export class JsonAdapterService {
     const sample = array
       .filter(this.isPrimitive)
       .slice(0, ctx.cfg.jsonArraySampleSize ?? 3)
-      .map((v) => this.previewValue(v));
+      .map((v) => this.previewValue(v, ctx.cfg.jsonStringMaxLen));
 
     return {
       id,
@@ -250,47 +250,52 @@ export class JsonAdapterService {
     depth: number,
     ctx: AdapterContext
   ): SchemaNode {
-    const entries = Object.entries(obj).filter(
-      ([k]) => !(ctx.cfg.jsonIgnoreKeys ?? []).includes(k)
-    );
+    const ignore = ctx.cfg.jsonIgnoreKeys ?? [];
+    const entries = Object.entries(obj).filter(([k]) => !ignore.includes(k));
 
     // Separar primitivos y estructuras
     const primitives: Record<string, unknown> = {};
-    const arraysPreview: Record<
-      string,
-      { length: number; sample?: unknown[] }
-    > = {};
     let hasNestedStructures = false;
 
+    const maxLen = ctx.cfg.jsonStringMaxLen ?? 100;
+    const arraySampleSize = ctx.cfg.jsonArraySampleSize ?? 3;
+
     for (const [k, v] of entries) {
-      if (this.isPrimitive(v)) {
-        primitives[k] = this.previewValue(v);
+      if (
+        v === null ||
+        typeof v === 'string' ||
+        typeof v === 'number' ||
+        typeof v === 'boolean' ||
+        typeof v === 'bigint'
+      ) {
+        // ⚠️ Usamos this.previewValue(v, maxLen) para evitar cards gigantes por strings largas
+        primitives[k] = this.previewValue(v, maxLen);
       } else if (Array.isArray(v)) {
+        // Marca que hay estructuras anidadas; los elementos del array se procesan fuera (children)
         hasNestedStructures = true;
-        arraysPreview[k] = {
-          length: v.length,
-          sample: v
-            .filter(this.isPrimitive)
-            .slice(0, ctx.cfg.jsonArraySampleSize ?? 3)
-            .map(this.previewValue),
-        };
-      } else if (this.isObject(v)) {
+
+        // (Opcional: no agregamos 'arrays' a jsonMeta para mantener el modelo simple)
+        // Si quisieras mostrar un mini-adelanto, puedes dejar un preview genérico:
+        // primitives[k] = `Array[${v.length}]`;
+      } else if (typeof v === 'object') {
         hasNestedStructures = true;
       }
     }
 
-    const title = this.generateObjectTitle(
-      obj,
-      key,
-      ctx.cfg.jsonTitleKeys ?? ['name', 'title', 'label', 'id', 'key']
-    );
-    const titleKey = this.findTitleKey(
-      obj,
-      ctx.cfg.jsonTitleKeys ?? ['name', 'title', 'label', 'id', 'key']
-    );
+    // Título inteligente (prioriza jsonTitleKeys)
+    const titleKeys = ctx.cfg.jsonTitleKeys ?? [
+      'name',
+      'title',
+      'label',
+      'id',
+      'key',
+    ];
+    const title = this.generateObjectTitle(obj, key, titleKeys);
+    const titleKey = this.findTitleKey(obj, titleKeys);
 
+    // Evitar duplicar el atributo que se usó como título
     if (titleKey && primitives[titleKey] != null) {
-      delete primitives[titleKey]; // evitar duplicado de título
+      delete primitives[titleKey];
     }
 
     return {
@@ -306,15 +311,15 @@ export class JsonAdapterService {
         path: this.pathToString(path),
         title,
         titleKey,
-        attributes: primitives,
-        children: [],
+        attributes: primitives, // 👈 solo atributos primitivos (preview ya truncado)
+        children: [], // 👈 se llenará cuando procesemos propiedades/arrays anidados
         objectInfo: {
           keyCount: entries.length,
           hasNestedStructures,
         },
         preview: hasNestedStructures
           ? '{…}'
-          : this.generateObjectPreview(primitives),
+          : this.generateObjectPreview(primitives as Record<string, unknown>),
         depth,
         isLeaf: !hasNestedStructures,
         isEmpty: entries.length === 0,
@@ -610,10 +615,10 @@ export class JsonAdapterService {
     return path.length === 0 ? '$' : path.join('.');
   }
 
-  private previewValue(value: unknown): string {
+  private previewValue(value: unknown, maxLen = 100): string {
     if (value === null) return 'null';
     if (typeof value === 'string')
-      return JSON.stringify(this.truncate(String(value), 100));
+      return JSON.stringify(this.truncate(String(value), maxLen));
     if (
       typeof value === 'number' ||
       typeof value === 'boolean' ||

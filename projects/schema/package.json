@@ -1,6 +1,6 @@
 {
   "name": "@telefonica/schema",
-  "version": "0.1.27",
+  "version": "0.1.28",
   "peerDependencies": {
     "@angular/core": "^19.0.0",
     "@angular/common": "^19.0.0",
