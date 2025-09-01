@@ -1,11 +1,15 @@
 // projects/schema/src/lib/components/schema-card/schema-card.component.ts
 import {
+  AfterViewInit,
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   EventEmitter,
   Input,
-  TemplateRef,
+  OnDestroy,
   Output,
+  TemplateRef,
+  ViewChild,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { SchemaNode } from '../../models';
@@ -16,8 +20,8 @@ import { SchemaNode } from '../../models';
   imports: [CommonModule],
   template: `
     <div
+      #cardEl
       class="card"
-      [class.damage]="node?.state?.inDamage"
       [style.minWidth.px]="minWidth"
       [style.maxWidth.px]="maxWidth"
       (click)="cardClick.emit(node)"
@@ -29,25 +33,18 @@ import { SchemaNode } from '../../models';
         [ngTemplateOutletContext]="{
           $implicit: node,
           level: node?.level,
-          state: node?.state
+          state: node?.state,
         }"
-      >
-      </ng-container>
+      ></ng-container>
 
       <!-- Default renderer (GENÉRICO) -->
       <ng-template #defaultTpl>
-        <!-- (1) Título real: solo si existe; NO mostrar 'JSON-OBJECT/ARRAY/VALUE' -->
-        <div
-          class="title"
-          *ngIf="
-            showTitle &&
-            node?.jsonMeta?.title &&
-            node?.jsonMeta?.kind !== 'array'
-          "
-        >
+        <!-- Título (si existe). Evitamos mostrar títulos genéricos innecesarios -->
+        <div class="title" *ngIf="showTitle && node?.jsonMeta?.title">
           {{ node?.jsonMeta?.title }}
         </div>
-        <!-- (2) Atributos primitivos (filtrando el del título para no duplicar) -->
+
+        <!-- Atributos primitivos (ya sin duplicar el título) -->
         <div class="attrs" *ngIf="filteredAttrEntries(node)?.length">
           <div
             class="attr"
@@ -64,14 +61,12 @@ import { SchemaNode } from '../../models';
           </div>
         </div>
 
-        <!-- Badges de arrays (muestran sample si está disponible) -->
-        <div class="badges" *ngIf="arrayEntries(node)?.length">
-          <span class="badge" *ngFor="let b of arrayEntries(node)">
-            {{ b[0] }} [{{ b[1]?.length }}]
-            <ng-container *ngIf="b[1]?.sample?.length">
-              — {{ b[1]?.sample?.join(', ') }}
-            </ng-container>
-          </span>
+        <!-- Preview sencillo para arrays y objetos vacíos -->
+        <div
+          class="preview"
+          *ngIf="!filteredAttrEntries(node)?.length && node?.jsonMeta?.preview"
+        >
+          {{ node?.jsonMeta?.preview }}
         </div>
       </ng-template>
     </div>
@@ -81,9 +76,10 @@ import { SchemaNode } from '../../models';
       :host {
         display: block;
       }
+
       .card {
         display: inline-block;
-        width: auto; /* (4) ancho dinámico */
+        width: auto; /* ancho dinámico */
         min-height: 84px;
         box-sizing: border-box;
         border: 1px solid #d0d7de;
@@ -94,16 +90,11 @@ import { SchemaNode } from '../../models';
         cursor: default;
         user-select: none;
 
-        /* cortar textos largos (CAI, hashes, etc.) */
+        /* cortar textos largos (ids, hashes, etc.) */
         word-break: break-word;
         overflow-wrap: anywhere;
       }
-      .card.damage {
-        border-color: #e53935;
-        box-shadow: 0 0 0 2px rgba(229, 57, 53, 0.15);
-      }
 
-      /* (3) Título más grande, peso y color distinto */
       .title {
         font-weight: 700;
         font-size: 13.5px;
@@ -124,56 +115,102 @@ import { SchemaNode } from '../../models';
       .attr + .attr {
         margin-top: 2px;
       }
+
       .more {
         font-size: 10px;
         opacity: 0.6;
         margin-top: 4px;
       }
 
-      .badges {
-        margin-top: 8px;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-      }
-      .badge {
-        font-size: 10px;
-        padding: 2px 6px;
-        border-radius: 999px;
-        background: #eef2f6;
-        color: #374151;
-        border: 1px solid #d8e0ea;
+      .preview {
+        font-size: 11.5px;
+        opacity: 0.75;
       }
     `,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class SchemaCardComponent {
+export class SchemaCardComponent implements AfterViewInit, OnDestroy {
   @Input({ required: true }) node!: SchemaNode;
   @Input() cardTemplate?: TemplateRef<any> | null;
 
   /** Mostrar/ocultar título (si no hay título, no se renderiza) */
   @Input() showTitle = true;
 
-  /** (4) Límites de ancho dinámico de la card */
+  /** Límites de ancho dinámico de la card */
   @Input() minWidth = 220;
   @Input() maxWidth = 420;
 
   /** Límite de atributos mostrados por defecto */
   @Input() attrMax = 8;
 
+  /** Emite las medidas reales de la card (para P0.1 anti-solapes) */
+  @Output() sizeChange = new EventEmitter<{
+    id: string;
+    width: number;
+    height: number;
+  }>();
+
+  /** Click de card (passthrough) */
   @Output() cardClick = new EventEmitter<SchemaNode>();
 
-  /** Filtra el atributo que coincide con el título para no duplicarlo */
+  @ViewChild('cardEl', { static: true }) cardEl!: ElementRef<HTMLElement>;
+
+  private ro?: ResizeObserver;
+
+  ngAfterViewInit(): void {
+    // Emitimos medida inicial
+    this.emitSize();
+
+    // Observamos cambios de tamaño con ResizeObserver (auto-alto)
+    this.ro = new ResizeObserver(() => this.emitSize());
+    this.ro.observe(this.cardEl.nativeElement);
+  }
+
+  ngOnDestroy(): void {
+    this.ro?.disconnect();
+  }
+
+  private emitSize(): void {
+    if (!this.node?.id || !this.cardEl?.nativeElement) return;
+    const el = this.cardEl.nativeElement;
+    const rect = el.getBoundingClientRect();
+    // Nota: getBoundingClientRect usa px físicos; para layout basta width/height
+    this.sizeChange.emit({
+      id: this.node.id,
+      width: Math.ceil(rect.width),
+      height: Math.ceil(rect.height),
+    });
+  }
+
+  // Convierte cualquier valor a string de forma segura para mostrar en la card
+  private toText(v: unknown): string {
+    if (v === null) return 'null';
+    const t = typeof v;
+    if (t === 'string') return v as string;
+    if (t === 'number' || t === 'boolean' || t === 'bigint') return String(v);
+    try {
+      return JSON.stringify(v);
+    } catch {
+      return String(v);
+    }
+  }
+
   filteredAttrEntries(node?: SchemaNode): [string, string][] {
-    const attrs = node?.jsonMeta?.attributes;
+    const attrs = node?.jsonMeta?.attributes as
+      | Record<string, unknown>
+      | undefined;
     if (!attrs) return [];
-    const entries = Object.entries(attrs);
+
+    // Normalizamos a pares [clave, string]
+    const entries: [string, string][] = Object.entries(attrs).map(
+      ([k, v]) => [k, this.toText(v)] as [string, string]
+    );
 
     const title = node?.jsonMeta?.title;
     if (!title) return entries;
 
-    // Si el título viene del fallback "clave: valor"
+    // Si el título es "clave: valor", removemos esa "clave" de atributos
     const maybeKey = title.includes(':')
       ? title
           .split(':')[0]
@@ -182,17 +219,8 @@ export class SchemaCardComponent {
       : undefined;
 
     return entries.filter(([k, v]) => {
-      // quitar por clave si coincide con "clave" del fallback
       if (maybeKey && k === maybeKey) return false;
-      // o quitar si el valor textual coincide exactamente con el título
-      return String(v) !== title;
+      return v !== title;
     });
-  }
-
-  arrayEntries(
-    node?: SchemaNode
-  ): [string, { length: number; sample?: string[] }][] {
-    const m = node?.jsonMeta?.arrays;
-    return m ? Object.entries(m) : [];
   }
 }

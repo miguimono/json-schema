@@ -6,260 +6,699 @@ import {
   SchemaGraph,
   SchemaNode,
   SchemaOptions,
+  SchemaNodeType,
+  SchemaCategory,
+  withSchemaDefaults,
 } from '../models';
 
-type ArrayBadge = { length: number; sample?: string[] };
-
 /**
- * Adaptador genérico v2 (1 card = 1 objeto).
- * - Nodos SOLO para objetos (y array raíz).
- * - Primitivos -> jsonMeta.attributes.
- * - Arrays -> jsonMeta.arrays (con sample de primitivos) y SIEMPRE conecta hijos OBJETO con edges,
- *   para que existan conexiones visuales en cualquier policy.
- * - 'paged' hoy se comporta igual a 'count'.
- * - rank = depth.
+ * Convierte un JSON arbitrario en un grafo navegable (SchemaGraph).
+ *  - Genérico (sin referencias a dominios)
+ *  - Respetando límites (profundidad/hijos)
+ *  - Con títulos inteligentes y poda opcional
  */
 @Injectable({ providedIn: 'root' })
 export class JsonAdapterService {
-  buildGraphFromJson(data: unknown, opt: SchemaOptions = {}): SchemaGraph {
-    const maxDepth = opt.jsonMaxDepth ?? Infinity;
-    const maxChildren = opt.jsonMaxChildren ?? Infinity;
-    const strMax = Math.max(0, opt.jsonStringMaxLen ?? 80);
-    const arrayPolicy: JsonArrayPolicy = opt.jsonArrayPolicy ?? 'count';
-    // MODO GENÉRICO por defecto: sin claves de dominio
-    const titleKeys = opt.jsonTitleKeys ?? [];
-
-    const nodes: SchemaNode[] = [];
-    const edges: SchemaEdge[] = [];
-    const seen = new WeakMap<object, string>();
-
-    const isPrimitive = (v: unknown) =>
-      v === null ||
-      ['string', 'number', 'boolean', 'bigint'].includes(typeof v);
-
-    const makeId = (path: (string | number)[]) =>
-      [
-        '#',
-        ...path.map((seg) =>
-          String(seg).replaceAll('~', '~0').replaceAll('/', '~1')
-        ),
-      ].join('/');
-
-    const trunc = (s: string) =>
-      s.length > strMax ? s.slice(0, strMax) + '…' : s;
-
-    const previewOf = (v: unknown): string => {
-      if (v === null) return 'null';
-      if (typeof v === 'string') return JSON.stringify(trunc(v));
-      if (typeof v === 'number' || typeof v === 'boolean') return String(v);
-      if (Array.isArray(v)) return `[${v.length}]`;
-      if (typeof v === 'object') return '{…}';
-      return String(v);
+  buildGraphFromJson(data: unknown, options: SchemaOptions = {}): SchemaGraph {
+    const cfg = withSchemaDefaults(options);
+    const ctx: AdapterContext = {
+      nodes: [],
+      edges: [],
+      seen: new WeakMap<object, string>(),
+      cfg,
     };
 
-    /** Intenta elegir un título legible para un objeto, usando titleKeys si se suministran */
-    const pickTitle = (obj: any): string | undefined => {
-      if (!obj || typeof obj !== 'object') return undefined;
-      for (const k of titleKeys) if (obj[k] != null) return String(obj[k]);
-      // fallback opcional: primera clave primitiva
-      for (const [k, v] of Object.entries(obj))
-        if (isPrimitive(v)) return `${k}: ${previewOf(v)}`;
-      return undefined;
+    // Caso especial: raíz primitiva -> crear un nodo raíz simple
+    if (this.isPrimitive(data)) {
+      const id = this.generateId([]); // "$" raíz
+      ctx.nodes.push(this.createRootPrimitiveNode(id, data));
+      return this.finalize(ctx);
+    }
+
+    // Procesar raíz (objeto o array)
+    const rootId = this.processValue(data, [], 0, ctx);
+
+    // Si por alguna razón no se generó nodo (JSON inesperado), aseguramos raíz
+    if (!rootId) {
+      const id = this.generateId([]);
+      ctx.nodes.push(this.createRootPrimitiveNode(id, data));
+    }
+
+    return this.finalize(ctx);
+  }
+
+  // ---------------------------
+  // Proceso principal
+  // ---------------------------
+
+  private processValue(
+    value: unknown,
+    path: (string | number)[],
+    depth: number,
+    ctx: AdapterContext,
+    parentId?: string,
+    relationshipLabel?: string
+  ): string | null {
+    // Límite de profundidad
+    if (depth >= (ctx.cfg.jsonMaxDepth ?? 10)) {
+      const id = this.createTruncatedNode(
+        path,
+        depth,
+        ctx,
+        parentId,
+        relationshipLabel
+      );
+      return id;
+    }
+
+    if (Array.isArray(value)) {
+      return this.processArray(
+        value,
+        path,
+        depth,
+        ctx,
+        parentId,
+        relationshipLabel
+      );
+    }
+
+    if (this.isObject(value)) {
+      return this.processObject(
+        value as Record<string, unknown>,
+        path,
+        depth,
+        ctx,
+        parentId,
+        relationshipLabel
+      );
+    }
+
+    // Los primitivos se muestran como atributos del padre (no generan nodo),
+    // excepto en raíz o casos especiales (truncado/ciclos) manejados aparte.
+    return null;
+  }
+
+  private processArray(
+    array: unknown[],
+    path: (string | number)[],
+    depth: number,
+    ctx: AdapterContext,
+    parentId?: string,
+    relationshipLabel?: string
+  ): string {
+    const id = this.generateId(path);
+
+    // Ciclos
+    if (
+      this.handleCyclicReference(
+        array,
+        path,
+        depth,
+        ctx,
+        parentId,
+        relationshipLabel
+      )
+    ) {
+      const refId = id + '_ref';
+      // ya se agregó edge y nodo de referencia dentro de handleCyclicReference
+      return refId;
+    }
+
+    const key = this.getPathKey(path);
+    const node = this.createArrayNode(array, id, key, path, depth, ctx);
+    ctx.nodes.push(node);
+
+    if (parentId) {
+      this.createEdge(parentId, id, ctx, relationshipLabel, 'parent-child');
+    }
+
+    // Procesar hijos (objetos / arrays) respetando política y límites
+    this.processArrayElements(array, path, depth, ctx, id);
+
+    return id;
+  }
+
+  private processObject(
+    obj: Record<string, unknown>,
+    path: (string | number)[],
+    depth: number,
+    ctx: AdapterContext,
+    parentId?: string,
+    relationshipLabel?: string
+  ): string {
+    const id = this.generateId(path);
+
+    // Ciclos
+    if (
+      this.handleCyclicReference(
+        obj,
+        path,
+        depth,
+        ctx,
+        parentId,
+        relationshipLabel
+      )
+    ) {
+      const refId = id + '_ref';
+      return refId;
+    }
+
+    const key = this.getPathKey(path);
+    const node = this.createObjectNode(obj, id, key, path, depth, ctx);
+    ctx.nodes.push(node);
+
+    if (parentId) {
+      this.createEdge(parentId, id, ctx, relationshipLabel, 'parent-child');
+    }
+
+    // Procesar propiedades (objetos/arrays)
+    this.processObjectProperties(obj, path, depth, ctx, id);
+
+    return id;
+  }
+
+  // ---------------------------
+  // Creación de nodos
+  // ---------------------------
+
+  private createRootPrimitiveNode(id: string, value: unknown): SchemaNode {
+    return {
+      id,
+      type: 'json-root',
+      category: 'leaf',
+      data: value,
+      level: 0,
+      rank: 0,
+      jsonMeta: {
+        kind: 'root',
+        path: '$',
+        title: this.previewValue(value),
+        attributes: { value: this.previewValue(value) },
+        depth: 0,
+        isLeaf: true,
+        isEmpty: value == null,
+      },
     };
+  }
 
-    /** OBJETO -> crea nodo y enlaza hijos objeto */
-    const visitObject = (
-      obj: Record<string, unknown>,
-      path: (string | number)[],
-      depth: number,
-      parentId?: string,
-      edgeLabel?: string,
-      forceLevel: 'json-object' | 'json-array' = 'json-object'
-    ) => {
-      const id = makeId(path);
+  private createArrayNode(
+    array: unknown[],
+    id: string,
+    key: string | undefined,
+    path: (string | number)[],
+    depth: number,
+    ctx: AdapterContext
+  ): SchemaNode {
+    const analysis = this.analyzeArrayContent(array);
+    const sample = array
+      .filter(this.isPrimitive)
+      .slice(0, ctx.cfg.jsonArraySampleSize ?? 3)
+      .map((v) => this.previewValue(v));
 
-      // Evitar ciclos
-      const ref = seen.get(obj as object);
-      if (ref && ref !== id) {
-        const refNodeId = id + '↺';
-        nodes.push({
-          id: refNodeId,
-          level: 'json-value',
-          data: { $ref: ref },
-          rank: depth,
-          jsonMeta: { kind: 'value', depth, preview: `↺ ref ${ref}` },
-        });
-        if (parentId) {
-          edges.push({
-            id: `${parentId}->${refNodeId}`,
-            sourceId: parentId,
-            targetId: refNodeId,
-            label: edgeLabel,
-          });
-        }
-        return;
+    return {
+      id,
+      type: 'json-array',
+      category: 'collection',
+      data: array,
+      level: depth,
+      rank: depth,
+      jsonMeta: {
+        kind: 'array',
+        key,
+        path: this.pathToString(path),
+        title: this.generateArrayTitle(key, array.length),
+        attributes: {}, // arrays no listan primitivos como nodos
+        children: [], // se rellenará al procesar elementos complejos
+        arrayInfo: {
+          length: array.length,
+          itemType: analysis.itemType,
+          sample: sample.length > 0 ? sample : undefined,
+        },
+        preview: `Array[${array.length}]`,
+        depth,
+        isLeaf: array.length === 0,
+        isEmpty: array.length === 0,
+      },
+    };
+  }
+
+  private createObjectNode(
+    obj: Record<string, unknown>,
+    id: string,
+    key: string | undefined,
+    path: (string | number)[],
+    depth: number,
+    ctx: AdapterContext
+  ): SchemaNode {
+    const entries = Object.entries(obj).filter(
+      ([k]) => !(ctx.cfg.jsonIgnoreKeys ?? []).includes(k)
+    );
+
+    // Separar primitivos y estructuras
+    const primitives: Record<string, unknown> = {};
+    const arraysPreview: Record<
+      string,
+      { length: number; sample?: unknown[] }
+    > = {};
+    let hasNestedStructures = false;
+
+    for (const [k, v] of entries) {
+      if (this.isPrimitive(v)) {
+        primitives[k] = this.previewValue(v);
+      } else if (Array.isArray(v)) {
+        hasNestedStructures = true;
+        arraysPreview[k] = {
+          length: v.length,
+          sample: v
+            .filter(this.isPrimitive)
+            .slice(0, ctx.cfg.jsonArraySampleSize ?? 3)
+            .map(this.previewValue),
+        };
+      } else if (this.isObject(v)) {
+        hasNestedStructures = true;
       }
-      seen.set(obj as object, id);
+    }
 
-      const attributes: Record<string, string> = {};
-      const arrays: Record<string, ArrayBadge> = {};
-      const childrenToCreate: Array<{ key: string; value: unknown }> = [];
+    const title = this.generateObjectTitle(
+      obj,
+      key,
+      ctx.cfg.jsonTitleKeys ?? ['name', 'title', 'label', 'id', 'key']
+    );
+    const titleKey = this.findTitleKey(
+      obj,
+      ctx.cfg.jsonTitleKeys ?? ['name', 'title', 'label', 'id', 'key']
+    );
 
-      // Clasificar props
-      const entries = Object.entries(obj);
-      for (let i = 0; i < Math.min(entries.length, maxChildren); i++) {
-        const [k, v] = entries[i];
+    if (titleKey && primitives[titleKey] != null) {
+      delete primitives[titleKey]; // evitar duplicado de título
+    }
 
-        if (isPrimitive(v)) {
-          attributes[k] = previewOf(v);
-          continue;
-        }
+    return {
+      id,
+      type: depth === 0 ? 'json-root' : 'json-object',
+      category: hasNestedStructures ? 'container' : 'structure',
+      data: obj,
+      level: depth,
+      rank: depth,
+      jsonMeta: {
+        kind: depth === 0 ? 'root' : 'object',
+        key,
+        path: this.pathToString(path),
+        title,
+        titleKey,
+        attributes: primitives,
+        children: [],
+        objectInfo: {
+          keyCount: entries.length,
+          hasNestedStructures,
+        },
+        preview: hasNestedStructures
+          ? '{…}'
+          : this.generateObjectPreview(primitives),
+        depth,
+        isLeaf: !hasNestedStructures,
+        isEmpty: entries.length === 0,
+      },
+    };
+  }
 
-        if (Array.isArray(v)) {
-          const len = v.length;
-          const entry: ArrayBadge = (arrays[k] = { length: len });
+  private createTruncatedNode(
+    path: (string | number)[],
+    depth: number,
+    ctx: AdapterContext,
+    parentId?: string,
+    relationshipLabel?: string
+  ): string {
+    const id = this.generateId(path) + '_truncated';
+    const node: SchemaNode = {
+      id,
+      type: 'json-primitive',
+      category: 'leaf',
+      data: null,
+      level: depth,
+      rank: depth,
+      jsonMeta: {
+        kind: 'primitive',
+        path: this.pathToString(path),
+        title: 'Max depth reached',
+        attributes: { note: 'Increase jsonMaxDepth to expand' },
+        preview: '⋯',
+        depth,
+        isLeaf: true,
+        isEmpty: false,
+      },
+    };
+    ctx.nodes.push(node);
 
-          // sample de primitivos en badge
-          const samplePrim = v
-            .filter(
-              (el) =>
-                el === null ||
-                ['string', 'number', 'boolean', 'bigint'].includes(typeof el)
-            )
-            .slice(0, 3)
-            .map(previewOf);
-          if (samplePrim.length) entry.sample = samplePrim;
+    if (parentId) {
+      this.createEdge(parentId, id, ctx, relationshipLabel, 'parent-child');
+      // Actualizar children del padre
+      const parent = ctx.nodes.find((n) => n.id === parentId);
+      parent?.jsonMeta.children?.push(id);
+    }
 
-          // SIEMPRE materializar hijos objeto (edges)
-          if (depth < maxDepth) {
-            let created = 0;
-            for (let idx = 0; idx < v.length && created < maxChildren; idx++) {
-              const el = v[idx];
-              if (el && typeof el === 'object' && !Array.isArray(el)) {
-                childrenToCreate.push({ key: `${k}[${idx}]`, value: el });
-                created++;
-              }
-            }
-          }
-          continue;
-        }
+    return id;
+  }
 
-        // objeto hijo
-        if (v && typeof v === 'object') {
-          childrenToCreate.push({ key: k, value: v });
+  // ---------------------------
+  // Procesamiento de hijos
+  // ---------------------------
+
+  private processArrayElements(
+    array: unknown[],
+    path: (string | number)[],
+    depth: number,
+    ctx: AdapterContext,
+    arrayNodeId: string
+  ): void {
+    const policy: JsonArrayPolicy = ctx.cfg.jsonArrayPolicy ?? 'sample';
+    const maxChildren = ctx.cfg.jsonMaxChildren ?? 50;
+    const sampleSize = ctx.cfg.jsonArraySampleSize ?? 3;
+
+    // Política simple:
+    //  - "count": no expandir hijos
+    //  - "fanout": expandir hasta sampleSize
+    //  - "sample": expandir hasta sampleSize (similar, pero semántico)
+    //  - "paged": (no implementamos paginación aquí; tratamos como "fanout")
+    let limit = maxChildren;
+    if (policy === 'count') limit = 0;
+    else if (policy === 'fanout' || policy === 'sample' || policy === 'paged')
+      limit = Math.min(maxChildren, sampleSize);
+
+    let processed = 0;
+    for (let i = 0; i < array.length && processed < limit; i++) {
+      const el = array[i];
+      if (this.isObject(el) || Array.isArray(el)) {
+        const childId = this.processValue(
+          el,
+          [...path, i],
+          depth + 1,
+          ctx,
+          arrayNodeId,
+          `[${i}]`
+        );
+        if (childId) {
+          processed++;
+          // Registrar hijo en el nodo array
+          const parent = ctx.nodes.find((n) => n.id === arrayNodeId);
+          parent?.jsonMeta.children?.push(childId);
         }
       }
+    }
+  }
 
-      const node: SchemaNode = {
-        id,
-        level: forceLevel,
-        data: obj,
+  private processObjectProperties(
+    obj: Record<string, unknown>,
+    path: (string | number)[],
+    depth: number,
+    ctx: AdapterContext,
+    objectNodeId: string
+  ): void {
+    const entries = Object.entries(obj).filter(
+      ([k]) => !(ctx.cfg.jsonIgnoreKeys ?? []).includes(k)
+    );
+    const maxChildren = ctx.cfg.jsonMaxChildren ?? 50;
+
+    let processed = 0;
+    for (const [key, value] of entries) {
+      if (processed >= maxChildren) break;
+
+      if (this.isObject(value) || Array.isArray(value)) {
+        const childId = this.processValue(
+          value,
+          [...path, key],
+          depth + 1,
+          ctx,
+          objectNodeId,
+          key
+        );
+        if (childId) {
+          processed++;
+          const parent = ctx.nodes.find((n) => n.id === objectNodeId);
+          parent?.jsonMeta.children?.push(childId);
+        }
+      }
+    }
+  }
+
+  // ---------------------------
+  // Ciclos y edges
+  // ---------------------------
+
+  private handleCyclicReference(
+    obj: object,
+    path: (string | number)[],
+    depth: number,
+    ctx: AdapterContext,
+    parentId?: string,
+    relationshipLabel?: string
+  ): boolean {
+    const id = this.generateId(path);
+    const existing = ctx.seen.get(obj);
+
+    if (existing && existing !== id) {
+      const refNodeId = id + '_ref';
+      const refNode: SchemaNode = {
+        id: refNodeId,
+        type: 'json-primitive',
+        category: 'leaf',
+        data: { $ref: existing },
+        level: depth,
         rank: depth,
         jsonMeta: {
-          kind: forceLevel === 'json-array' ? 'array' : 'object',
-          key:
-            typeof path.at(-1) === 'string' ? String(path.at(-1)) : undefined,
-          index:
-            typeof path.at(-1) === 'number' ? Number(path.at(-1)) : undefined,
-          title: pickTitle(obj),
-          attributes,
-          arrays,
-          preview: '{…}',
+          kind: 'primitive',
+          path: this.pathToString(path),
+          title: `Reference to ${existing}`,
+          attributes: { ref: existing },
+          preview: `↺ ${existing}`,
           depth,
+          isLeaf: true,
+          isEmpty: false,
         },
       };
-      nodes.push(node);
+      ctx.nodes.push(refNode);
 
       if (parentId) {
-        edges.push({
-          id: `${parentId}->${id}`,
-          sourceId: parentId,
-          targetId: id,
-          label: edgeLabel,
-        });
-      }
-
-      if (depth >= maxDepth) return;
-
-      // Crear hijos objeto
-      for (const child of childrenToCreate) {
-        visitAny(child.value, [...path, child.key], depth + 1, id, child.key);
-      }
-    };
-
-    /** ARRAY en raíz -> crea nodo array y conecta hijos objeto */
-    const visitArrayRoot = (
-      arr: unknown[],
-      path: (string | number)[],
-      depth: number
-    ) => {
-      const id = makeId(path);
-      const arrays = { items: { length: arr.length } as ArrayBadge };
-
-      nodes.push({
-        id,
-        level: 'json-array',
-        data: arr,
-        rank: depth,
-        jsonMeta: {
-          kind: 'array',
-          depth,
-          arrays,
-          preview: `[${arr.length}]`,
-          title: 'Array',
-        },
-      });
-
-      if (depth >= maxDepth) return;
-
-      // materializar hijos objeto en arrays raíz
-      let created = 0;
-      for (let i = 0; i < arr.length && created < maxChildren; i++) {
-        const el = arr[i];
-        if (el && typeof el === 'object' && !Array.isArray(el)) {
-          visitAny(el, [...path, i], depth + 1, id, String(i));
-          created++;
-        }
-      }
-    };
-
-    /** Dispatcher genérico */
-    const visitAny = (
-      value: unknown,
-      path: (string | number)[],
-      depth: number,
-      parentId?: string,
-      edgeLabel?: string
-    ) => {
-      if (value && typeof value === 'object') {
-        if (Array.isArray(value)) return visitArrayRoot(value, path, depth);
-        return visitObject(
-          value as Record<string, unknown>,
-          path,
-          depth,
+        this.createEdge(
           parentId,
-          edgeLabel
+          refNodeId,
+          ctx,
+          relationshipLabel,
+          'reference'
+        );
+        // registrar también como hijo del padre
+        const parent = ctx.nodes.find((n) => n.id === parentId);
+        parent?.jsonMeta.children?.push(refNodeId);
+      }
+      return true;
+    }
+
+    ctx.seen.set(obj, id);
+    return false;
+  }
+
+  private createEdge(
+    sourceId: string,
+    targetId: string,
+    ctx: AdapterContext,
+    label?: string,
+    relationship: 'parent-child' | 'reference' | 'array-item' = 'parent-child'
+  ): void {
+    const edge: SchemaEdge = {
+      id: `${sourceId}->${targetId}`,
+      sourceId,
+      targetId,
+      meta: { relationship, label },
+    };
+    ctx.edges.push(edge);
+  }
+
+  // ---------------------------
+  // Poda y metadatos finales
+  // ---------------------------
+
+  private finalize(ctx: AdapterContext): SchemaGraph {
+    if (ctx.cfg.hideEmptyNodes) {
+      this.pruneEmptyNodes(ctx);
+    }
+
+    const maxDepth = ctx.nodes.length
+      ? Math.max(...ctx.nodes.map((n) => n.jsonMeta.depth))
+      : 0;
+
+    return {
+      nodes: ctx.nodes,
+      edges: ctx.edges,
+      meta: {
+        rootNodeId: ctx.nodes[0]?.id,
+        maxDepth,
+        totalNodes: ctx.nodes.length,
+        totalEdges: ctx.edges.length,
+        nodeTypeCount: this.countNodeTypes(ctx.nodes),
+      },
+    };
+  }
+
+  private pruneEmptyNodes(ctx: AdapterContext): void {
+    const removable = new Set(
+      ctx.nodes
+        .filter((n) => n.jsonMeta.isEmpty && n.type !== 'json-root')
+        .map((n) => n.id)
+    );
+
+    if (removable.size === 0) return;
+
+    // Filtrar nodos y edges
+    ctx.nodes = ctx.nodes.filter((n) => !removable.has(n.id));
+    ctx.edges = ctx.edges.filter(
+      (e) => !removable.has(e.sourceId) && !removable.has(e.targetId)
+    );
+
+    // Limpiar listas de hijos en los nodos restantes
+    for (const node of ctx.nodes) {
+      if (node.jsonMeta.children) {
+        node.jsonMeta.children = node.jsonMeta.children.filter(
+          (id) => !removable.has(id)
         );
       }
-      // raíz primitiva => crea nodo 'value'
-      if (!parentId) {
-        const id = makeId(path);
-        nodes.push({
-          id,
-          level: 'json-value',
-          data: value,
-          rank: depth,
-          jsonMeta: { kind: 'value', depth, preview: previewOf(value) },
-        });
-      }
-    };
-
-    // Raíz
-    if (Array.isArray(data)) visitArrayRoot(data, [], 0);
-    else if (data && typeof data === 'object')
-      visitObject(data as Record<string, unknown>, [], 0);
-    else visitAny(data, [], 0);
-
-    return { nodes, edges };
+    }
   }
+
+  private countNodeTypes(nodes: SchemaNode[]): Record<SchemaNodeType, number> {
+    const initial: Record<SchemaNodeType, number> = {
+      'json-object': 0,
+      'json-array': 0,
+      'json-primitive': 0,
+      'json-root': 0,
+    };
+    for (const n of nodes) initial[n.type]++;
+    return initial;
+  }
+
+  // ---------------------------
+  // Utilidades
+  // ---------------------------
+
+  private isPrimitive(v: unknown): boolean {
+    return (
+      v === null || ['string', 'number', 'boolean', 'bigint'].includes(typeof v)
+    );
+  }
+
+  private isObject(v: unknown): boolean {
+    return v !== null && typeof v === 'object' && !Array.isArray(v);
+  }
+
+  private generateId(path: (string | number)[]): string {
+    // Estilo JSON Pointer simplificado; estable y legible
+    return path.length === 0
+      ? '$'
+      : [
+          '$',
+          ...path.map((seg) =>
+            String(seg).replace(/~/g, '~0').replace(/\//g, '~1')
+          ),
+        ].join('/');
+  }
+
+  private getPathKey(path: (string | number)[]): string | undefined {
+    const last = path[path.length - 1];
+    return typeof last === 'string' ? last : undefined;
+  }
+
+  private pathToString(path: (string | number)[]): string {
+    return path.length === 0 ? '$' : path.join('.');
+  }
+
+  private previewValue(value: unknown): string {
+    if (value === null) return 'null';
+    if (typeof value === 'string')
+      return JSON.stringify(this.truncate(String(value), 100));
+    if (
+      typeof value === 'number' ||
+      typeof value === 'boolean' ||
+      typeof value === 'bigint'
+    )
+      return String(value);
+    if (Array.isArray(value)) return `Array[${value.length}]`;
+    if (typeof value === 'object') return '{…}';
+    return String(value);
+  }
+
+  private truncate(str: string, max = 50): string {
+    return str.length > max ? str.slice(0, max) + '…' : str;
+  }
+
+  private analyzeArrayContent(array: unknown[]): {
+    itemType: 'mixed' | 'object' | 'primitive';
+    hasObjects: boolean;
+    hasPrimitives: boolean;
+  } {
+    if (array.length === 0)
+      return { itemType: 'mixed', hasObjects: false, hasPrimitives: false };
+    const hasObjects = array.some((x) => this.isObject(x) || Array.isArray(x));
+    const hasPrimitives = array.some((x) => this.isPrimitive(x));
+    let itemType: 'mixed' | 'object' | 'primitive';
+    if (hasObjects && hasPrimitives) itemType = 'mixed';
+    else if (hasObjects) itemType = 'object';
+    else itemType = 'primitive';
+    return { itemType, hasObjects, hasPrimitives };
+  }
+
+  private generateObjectTitle(
+    obj: Record<string, unknown>,
+    key: string | undefined,
+    titleKeys: string[]
+  ): string {
+    for (const tKey of titleKeys) {
+      const val = obj[tKey];
+      if (val != null && this.isPrimitive(val)) {
+        return this.truncate(String(val));
+      }
+    }
+    if (key) return this.humanizeKey(key);
+    for (const [k, v] of Object.entries(obj)) {
+      if (this.isPrimitive(v) && v != null) {
+        return `${this.humanizeKey(k)}: ${this.previewValue(v)}`;
+      }
+    }
+    return 'Object';
+  }
+
+  private findTitleKey(
+    obj: Record<string, unknown>,
+    titleKeys: string[]
+  ): string | undefined {
+    for (const k of titleKeys) {
+      if (obj[k] != null && this.isPrimitive(obj[k])) return k;
+    }
+    return undefined;
+  }
+
+  private generateArrayTitle(key: string | undefined, length: number): string {
+    return key ? `${this.humanizeKey(key)} [${length}]` : `Array [${length}]`;
+  }
+
+  private generateObjectPreview(attributes: Record<string, unknown>): string {
+    const keys = Object.keys(attributes);
+    if (keys.length === 0) return '{}';
+    if (keys.length === 1) return `{${keys[0]}: ${attributes[keys[0]]}}`;
+    return `{${keys.length} properties}`;
+  }
+
+  private humanizeKey(key: string): string {
+    return key
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/[_-]/g, ' ')
+      .replace(/\b\w/g, (l) => l.toUpperCase())
+      .trim();
+  }
+}
+
+// Contexto interno del adaptador (simple y tipado)
+interface AdapterContext {
+  nodes: SchemaNode[];
+  edges: SchemaEdge[];
+  seen: WeakMap<object, string>;
+  cfg: SchemaOptions;
 }

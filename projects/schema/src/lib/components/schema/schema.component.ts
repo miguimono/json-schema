@@ -21,15 +21,13 @@ import {
   SchemaNode,
   SchemaOptions,
   SchemaSize,
+  withSchemaDefaults,
 } from '../../models';
 
 import { SchemaLayoutService } from '../../services/schema-layout.service';
 import { JsonAdapterService } from '../../services/json-adapter.service';
-import { SchemaCardComponent } from '../schema-card/scheme-card.component';
+import { SchemaCardComponent } from '../schema-card/schema-card.component';
 import { SchemaLinksComponent } from '../schema-links/schema-links.component';
-
-
-type DrawableEdge = { id: string; d: string };
 
 @Component({
   selector: 'schema',
@@ -57,7 +55,7 @@ type DrawableEdge = { id: string; d: string };
           [style.width.px]="size().width"
           [style.height.px]="size().height"
         >
-          <!-- Links en SVG (unificados) -->
+          <!-- Links en SVG -->
           <svg
             class="schema-links"
             [attr.viewBox]="'0 0 ' + size().width + ' ' + size().height"
@@ -67,9 +65,10 @@ type DrawableEdge = { id: string; d: string };
               schema-links
               [edges]="edges()"
               [positions]="positions()"
-              [linkStyle]="options().linkStyle === 'curve' ? 'curve' : 'line'"
+              [linkStyle]="options().linkStyle || 'orthogonal'"
               [nodeWidth]="NODE_W"
               [nodeHeight]="NODE_H"
+              [nodeSizes]="nodeSizeMap()"
               [stroke]="linkStroke()"
               [strokeWidth]="linkStrokeWidth()"
               (linkClick)="linkClick.emit($event)"
@@ -92,9 +91,9 @@ type DrawableEdge = { id: string; d: string };
               <schema-card
                 [node]="n"
                 [cardTemplate]="cardTemplate()"
+                (sizeChange)="onCardSize($event)"
                 (cardClick)="nodeClick.emit($event)"
-              >
-              </schema-card>
+              ></schema-card>
             </div>
           </div>
         </div>
@@ -114,7 +113,7 @@ type DrawableEdge = { id: string; d: string };
         background: #f7f8fa;
         border-radius: 8px;
         border: 1px solid #e5e7eb;
-        touch-action: none; /* permite pan/zoom pointer events */
+        touch-action: none; /* permite pan/zoom con pointer events */
         cursor: default;
       }
       .zoom-layer {
@@ -152,28 +151,25 @@ type DrawableEdge = { id: string; d: string };
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SchemaComponent implements AfterViewInit {
+  /** Tamaño por defecto de card (fallback mientras se miden alturas reales) */
   readonly NODE_W = 220;
   readonly NODE_H = 84;
 
   // Inputs
   graph = input<SchemaGraph | null>(null);
   data = input<unknown | null>(null);
-  // Personalización de links desde el consumidor
-  linkStroke = input<string>('#98a1a9');
-  linkStrokeWidth = input<number>(2);
   options = input<SchemaOptions>({
     gapX: 300,
     gapY: 140,
     padding: 24,
-    linkStyle: 'curve',
+    linkStyle: 'orthogonal',
     layout: 'tree',
     align: 'firstChild',
     jsonArrayPolicy: 'count',
     jsonAttrMax: 8,
     jsonStringMaxLen: 80,
-    // MODO GENÉRICO por defecto: sin claves de dominio
     jsonTitleKeys: [],
-    // Pan & Zoom defaults
+    // Pan & Zoom
     panZoomEnabled: true,
     zoomMin: 0.25,
     zoomMax: 2,
@@ -184,6 +180,10 @@ export class SchemaComponent implements AfterViewInit {
     hideRootObjectCard: false,
   });
   cardTemplate = input<TemplateRef<any> | null>(null);
+
+  // Personalización de links desde el consumidor
+  linkStroke = input<string>('#98a1a9');
+  linkStrokeWidth = input<number>(2);
 
   // Outputs
   nodeClick = output<SchemaNode>();
@@ -201,11 +201,15 @@ export class SchemaComponent implements AfterViewInit {
   private _positions = signal<PositionsMap>(new Map());
   private _size = signal<SchemaSize>({ width: 800, height: 600 });
   private _graph = signal<SchemaGraph>({ nodes: [], edges: [] });
+  private _nodeSizeMap = signal<
+    Record<string, { width: number; height: number }>
+  >({});
 
   positions = computed(() => this._positions());
   size = computed(() => this._size());
   nodes = computed(() => this._graph().nodes);
   edges = computed(() => this._graph().edges);
+  nodeSizeMap = computed(() => this._nodeSizeMap());
 
   // Pan & Zoom state
   private _zoom = signal(1);
@@ -218,47 +222,42 @@ export class SchemaComponent implements AfterViewInit {
   );
 
   constructor() {
-    // 1) Definir el graph efectivo (prioriza graph; si no, data JSON) + Poda anti-fantasmas
+    // 1) Definir el grafo efectivo (prioriza graph; si no, data JSON)
     effect(
       () => {
-        const providedGraph = this.graph();
+        const provided = this.graph();
         const raw = this.data();
+        const cfg = withSchemaDefaults(this.options());
 
-        if (providedGraph && providedGraph.nodes?.length) {
-          this._graph.set(providedGraph);
+        if (provided && provided.nodes?.length) {
+          this._graph.set(provided);
         } else if (raw != null) {
-          const opt = this.options();
-          const g0 = this.jsonAdapter.buildGraphFromJson(raw, opt);
-          const g = this.filterRootContainers(g0, opt);
-          this._graph.set(g);
+          const g = this.jsonAdapter.buildGraphFromJson(raw, cfg);
+          this._graph.set(this.filterRootContainers(g, cfg));
         } else {
           this._graph.set({ nodes: [], edges: [] });
         }
 
-        // Al cambiar el graph, haremos fit on next layout
+        // Al cambiar el graph fuente: reset de medidas por nodo y forzar fit en siguiente layout
+        this._nodeSizeMap.set({});
         this.fittedOnce = false;
       },
       { allowSignalWrites: true }
     );
 
-    // 2) Calcular layout
+    // 2) Calcular layout (usa medidas reales si ya existen en cada node.size)
     effect(
       () => {
         const g = this._graph();
-        const opt = this.options();
-        const res =
-          opt.layout === 'level'
-            ? this.layout.layoutLevel(g, opt, {
-                w: this.NODE_W,
-                h: this.NODE_H,
-              })
-            : this.layout.layoutTree(g, opt, {
-                w: this.NODE_W,
-                h: this.NODE_H,
-              });
-        this._positions.set(res.positions);
-        this._size.set(res.size);
-        // Si aún no hicimos fit y está habilitado, ajustamos
+        const cfg = withSchemaDefaults(this.options());
+        const { positions, size } = this.layout.calculateLayout(g, cfg, {
+          width: this.NODE_W,
+          height: this.NODE_H,
+        });
+        this._positions.set(positions);
+        this._size.set(size);
+
+        // Ajuste inicial (fit) la primera vez que tenemos layout
         queueMicrotask(() => this.tryAutoFit());
       },
       { allowSignalWrites: true }
@@ -266,78 +265,68 @@ export class SchemaComponent implements AfterViewInit {
   }
 
   ngAfterViewInit(): void {
-    this.tryAutoFit(); // por si layout ya estaba listo
+    this.tryAutoFit();
   }
 
-  // ===== PODA ANTI‑FANTASMAS =====
-  /**
-   * Elimina nodos vacíos (sin atributos, sin arrays y sin hijos).
-   * Conserva nodos 'value' y cualquier nodo con hijos.
-   */
-  private pruneEmpty(g: SchemaGraph): SchemaGraph {
-    const hasChild = new Map<string, boolean>();
-    for (const n of g.nodes) hasChild.set(n.id, false);
-    for (const e of g.edges) hasChild.set(e.sourceId, true);
-
-    const keep = (n: SchemaNode) => {
-      const kind = n.jsonMeta?.kind;
-      if (kind === 'value') return true; // siempre conservar valores
-      const attrs = n.jsonMeta?.attributes;
-      const arrays = n.jsonMeta?.arrays;
-      const hasAttrs = !!attrs && Object.keys(attrs).length > 0;
-      const hasArrays = !!arrays && Object.keys(arrays).length > 0;
-      const child = !!hasChild.get(n.id);
-      return hasAttrs || hasArrays || child;
-    };
-
-    const keptNodes = g.nodes.filter(keep);
-    const keptIds = new Set(keptNodes.map((n) => n.id));
-    const keptEdges = g.edges.filter(
-      (e) => keptIds.has(e.sourceId) && keptIds.has(e.targetId)
-    );
-    return { nodes: keptNodes, edges: keptEdges };
-  }
-
-  /** Elimina el nodo raíz contenedor si el JSON es [] o {} (configurable por opciones) */
+  // ===== Ocultar raíz contenedora (según opciones) =====
   private filterRootContainers(
     g: SchemaGraph,
     opt: SchemaOptions
   ): SchemaGraph {
-    // Un nodo "raíz contenedor" es el que tiene rank 0 y level json-array u json-object
-    const isRootContainer = (n: SchemaNode) => {
-      const isRootRank = (n.rank ?? 0) === 0;
-      if (!isRootRank) return false;
+    const hideArray = opt.hideRootArrayCard ?? true;
+    const hideObject = opt.hideRootObjectCard ?? false;
 
-      if (n.level === 'json-array' && (opt.hideRootArrayCard ?? true))
-        return true;
+    const rootCandidates = g.nodes.filter((n) => n.jsonMeta.depth === 0);
+    if (rootCandidates.length !== 1) return g;
 
-      if (n.level === 'json-object' && (opt.hideRootObjectCard ?? false)) {
-        // solo considera "vacío" si no tiene atributos ni arrays ni título útil
-        const hasAttrs =
-          !!n.jsonMeta?.attributes &&
-          Object.keys(n.jsonMeta!.attributes!).length > 0;
-        const hasArrays =
-          !!n.jsonMeta?.arrays && Object.keys(n.jsonMeta!.arrays!).length > 0;
-        const hasTitle = !!n.jsonMeta?.title;
-        return !hasAttrs && !hasArrays && !hasTitle;
-      }
+    const root = rootCandidates[0];
+    const isArrayRoot = root.type === 'json-array';
+    const isObjectRoot =
+      root.type === 'json-object' || root.type === 'json-root';
 
-      return false;
-    };
+    let shouldHide = false;
+    if (isArrayRoot && hideArray) shouldHide = true;
+    if (isObjectRoot && hideObject) {
+      const attrs = root.jsonMeta.attributes ?? {};
+      const hasAttrs = Object.keys(attrs).length > 0;
+      const hasChildren = (root.jsonMeta.children ?? []).length > 0;
+      const hasTitle = !!root.jsonMeta.title;
+      if (!hasAttrs && !hasChildren && !hasTitle) shouldHide = true;
+    }
 
-    const removed = new Set<string>();
-    for (const n of g.nodes) if (isRootContainer(n)) removed.add(n.id);
-    if (removed.size === 0) return g;
+    if (!shouldHide) return g;
 
-    const nodes = g.nodes.filter((n) => !removed.has(n.id));
+    const removedId = root.id;
+    const nodes = g.nodes.filter((n) => n.id !== removedId);
     const edges = g.edges.filter(
-      (e) => !removed.has(e.sourceId) && !removed.has(e.targetId)
+      (e) => e.sourceId !== removedId && e.targetId !== removedId
     );
-    return { nodes, edges };
+    return { nodes, edges, meta: g.meta };
   }
 
-  // ===== Pan & Zoom handlers =====
+  // ===== Recibir medidas reales de cada card (P0.1 anti-solapes) =====
+  onCardSize(e: { id: string; width: number; height: number }) {
+    // 1) guardar tamaño por id (para links)
+    const map = { ...this._nodeSizeMap() };
+    map[e.id] = { width: e.width, height: e.height };
+    this._nodeSizeMap.set(map);
 
+    // 2) actualizar node.size en el grafo para que el layout use medidas reales
+    const g = this._graph();
+    const idx = g.nodes.findIndex((n) => n.id === e.id);
+    if (idx >= 0) {
+      const updatedNode: SchemaNode = {
+        ...g.nodes[idx],
+        size: { width: e.width, height: e.height },
+      };
+      const newNodes = g.nodes.slice();
+      newNodes[idx] = updatedNode;
+      this._graph.set({ ...g, nodes: newNodes });
+    }
+    // El effect de layout reaccionará y recalculará posiciones
+  }
+
+  // ===== Pan & Zoom =====
   private panning = false;
   private lastX = 0;
   private lastY = 0;
@@ -357,15 +346,14 @@ export class SchemaComponent implements AfterViewInit {
     const maxZ = this.options().zoomMax ?? 2;
 
     const z0 = this._zoom();
-    const dir = (ev.deltaY || 0) > 0 ? -1 : 1; // rueda hacia abajo reduce, hacia arriba aumenta
+    const dir = (ev.deltaY || 0) > 0 ? -1 : 1; // rueda abajo reduce, arriba aumenta
     const z1 = this.clamp(z0 * (1 + dir * step), minZ, maxZ);
 
-    // Zoom centrado en cursor: mantener el “mundo” bajo el cursor fijo.
+    // Zoom centrado en cursor
     const tx0 = this._tx(),
       ty0 = this._ty();
     const worldX = (px - tx0) / z0;
     const worldY = (py - ty0) / z0;
-
     const tx1 = px - worldX * z1;
     const ty1 = py - worldY * z1;
 
@@ -379,14 +367,11 @@ export class SchemaComponent implements AfterViewInit {
 
     const target = ev.target as Element;
 
-    // 1) No iniciar pan si haces click en una Card
+    // No iniciar pan si haces click en una Card o en un path SVG (arista)
     if (target.closest('.card')) return;
-
-    // 2) No iniciar pan si haces click en una arista (path SVG)
     const tag = (target as Element).tagName?.toLowerCase?.() ?? '';
     if (tag === 'path' || target instanceof SVGPathElement) return;
 
-    // 3) Iniciar pan
     this.panning = true;
     this.activePointerId = ev.pointerId;
     this.wrapperRef.nativeElement.classList.add('panning');
@@ -449,7 +434,6 @@ export class SchemaComponent implements AfterViewInit {
         opt.zoomMax ?? 2
       );
       this._zoom.set(z);
-      // centra a ojo en 0,0 + padding
       const pad = opt.fitPadding ?? 24;
       this._tx.set(pad);
       this._ty.set(pad);
@@ -461,11 +445,6 @@ export class SchemaComponent implements AfterViewInit {
     return Math.max(a, Math.min(b, n));
   }
 
-  // Helpers existentes
-  onEdgeClick = (edgeId: string) => {
-    const e = this._graph().edges.find((x) => x.id === edgeId);
-    if (e) this.linkClick.emit(e);
-  };
+  // Trackers
   trackNodeById = (_: number, n: SchemaNode) => n.id;
-  trackPathById = (_: number, it: DrawableEdge) => it.id;
 }
