@@ -1,5 +1,5 @@
 {
-  "name": "@telefonica/schema",
+  "name": "@miguimono/schema",
   "version": "0.1.28",
   "peerDependencies": {
     "@angular/core": "^19.0.0",
