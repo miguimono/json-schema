@@ -91,6 +91,7 @@ import { SchemaLinksComponent } from '../schema-links/schema-links.component';
               <schema-card
                 [node]="n"
                 [cardTemplate]="cardTemplate()"
+                [showTitle]="options().showNodeTitle !== false"
                 (sizeChange)="onCardSize($event)"
                 (cardClick)="nodeClick.emit($event)"
               ></schema-card>

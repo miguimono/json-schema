@@ -176,6 +176,7 @@ export interface SchemaOptions {
   jsonArraySampleSize?: number; // Ítems en sample (default: 3)
   jsonTitleKeys?: string[]; // Claves priorizadas como título
   jsonIgnoreKeys?: string[]; // Claves a ignorar completamente
+  showNodeTitle?: boolean;
 
   // Control de visibilidad
   hideRootArrayCard?: boolean; // Ocultar card del array raíz
