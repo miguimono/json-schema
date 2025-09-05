@@ -4,6 +4,8 @@ import { TemplateRef } from '@angular/core';
 
 export type LayoutAlign = 'firstChild' | 'center';
 export type LinkStyle = 'orthogonal' | 'curve' | 'line';
+export type TitleMode = 'auto' | 'none';
+export type LayoutDirection = 'RIGHT' | 'DOWN';
 
 export interface SchemaNode {
   id: string;
@@ -15,6 +17,7 @@ export interface SchemaNode {
     attributes?: Record<string, any>;
     preview?: string;
     childrenCount?: number; // 👈 cantidad de hijos objeto/híbridos
+    arrayCounts?: Record<string, number>;
   };
   x?: number;
   y?: number;
@@ -72,7 +75,10 @@ export interface SchemaOptions {
   linkStrokeWidth?: number;
   layoutAlign?: LayoutAlign; // 'firstChild' | 'center'
   linkStyle?: LinkStyle; // 'orthogonal' | 'curve' | 'line'
+  curveTension?: number; // píxeles de “tirón” lateral (40–200)
   accentByKey?: string | null; // 👈 nueva
+  titleMode?: TitleMode;
+  layoutDirection?: LayoutDirection;
 }
 
 export const DEFAULT_OPTIONS: SchemaOptions = {
@@ -90,5 +96,8 @@ export const DEFAULT_OPTIONS: SchemaOptions = {
   linkStrokeWidth: 1.25,
   layoutAlign: 'center',
   linkStyle: 'orthogonal',
+  curveTension: 80,
   accentByKey: null,
+  titleMode: 'auto',
+  layoutDirection: 'RIGHT',
 };

@@ -21,43 +21,44 @@ export class JsonAdapterService {
 
     const arrayIsScalar = (arr: any[]) => arr.length > 0 && arr.every(isScalar);
 
-    const pickTitle = (obj: any): { title: string; usedKey?: string } => {
-      // 1) si hay prioridad, úsala
-      for (const k of options.titleKeyPriority) {
-        const v = obj?.[k];
-        if (v != null && String(v).trim() !== '')
-          return { title: String(v), usedKey: k };
+    const pickTitle = (obj: any, priorities: string[]) => {
+      if (priorities.length) {
+        for (const k of priorities) {
+          const v = obj?.[k];
+          if (v != null && String(v).trim() !== '')
+            return { title: String(v), usedKey: k };
+        }
       }
-      // 2) fallback: primer escalar encontrado
-      for (const [k, v] of Object.entries(obj ?? {})) {
-        if (isScalar(v)) return { title: String(v), usedKey: k };
-      }
-      // 3) último fallback
-      return { title: 'Item' };
+      // si NO hay prioridades, no forzamos título; que sea genérico
+      // y devolvemos usedKey = undefined para NO excluir nada del cuerpo
+      const firstScalar = Object.entries(obj ?? {}).find(([k, v]) =>
+        isScalar(v)
+      );
+      if (firstScalar)
+        return { title: String(firstScalar[1]), usedKey: undefined };
+      return { title: 'Item', usedKey: undefined };
     };
 
     const buildPreviewAttributes = (
       obj: any,
-      usedTitleKey?: string
-    ): Record<string, any> => {
-      if (!obj || typeof obj !== 'object') return {};
+      usedTitleKey?: string,
+      options: SchemaOptions = DEFAULT_OPTIONS
+    ) => {
       const entries: [string, any][] = [];
-      for (const [k, v] of Object.entries(obj)) {
-        if (k === usedTitleKey) continue; // 👈 no duplicar título
-        if ((options.hiddenKeysGlobal ?? []).includes(k)) continue; // solo afecta preview
-        if (isScalar(v)) {
-          entries.push([k, v]);
-        } else if (
+      for (const [k, v] of Object.entries(obj ?? {})) {
+        if ((options.hiddenKeysGlobal ?? []).includes(k)) continue;
+        // 👇 solo excluye si hubo prioridad (usedKey definido)
+        if (usedTitleKey && k === usedTitleKey) continue;
+        if (isScalar(v)) entries.push([k, v]);
+        else if (
           Array.isArray(v) &&
           options.treatScalarArraysAsAttribute &&
           arrayIsScalar(v)
-        ) {
+        )
           entries.push([k, v.join(', ')]);
-        }
       }
       return Object.fromEntries(entries.slice(0, options.previewMaxKeys));
     };
-
     const isEntity = (obj: any): boolean => {
       if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
       // entidad si tiene algún escalar o si calzó prioridad (aunque ésta esté vacía)
@@ -83,16 +84,31 @@ export class JsonAdapterService {
       return objs === 1;
     };
 
+    const arrayCountsOf = (obj: any) => {
+      const out: Record<string, number> = {};
+      for (const [k, v] of Object.entries(obj ?? {})) {
+        if (Array.isArray(v)) {
+          const scalarArr = v.length > 0 && v.every(isScalar);
+          if (!scalarArr) out[k] = v.length;
+        }
+      }
+      return out;
+    };
+
     const addNode = (jsonPath: string, obj: any, parentId?: string) => {
-      const { title, usedKey } = pickTitle(obj);
-      const attrs = buildPreviewAttributes(obj, usedKey);
+      const { title, usedKey } = pickTitle(obj, options.titleKeyPriority);
+      const attrs = buildPreviewAttributes(obj, usedKey, options);
       const node: SchemaNode = {
         id: jsonPath,
         jsonPath,
         label: title,
         data: obj,
-        jsonMeta: { title, attributes: attrs, childrenCount: 0 },
-        // tamaño mínimo; luego lo ajusta el auto-size del schema (si lo tienes)
+        jsonMeta: {
+          title,
+          attributes: attrs,
+          childrenCount: 0,
+          arrayCounts: arrayCountsOf(obj),
+        },
         width: 180,
         height: 72,
       };

@@ -41,7 +41,7 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
         </div>
 
         <div class="card-body">
-          <div class="card-title">
+          <div class="card-title" *ngIf="showTitle()">
             {{ node()?.jsonMeta?.title || node()?.label }}
           </div>
           <div
@@ -50,15 +50,23 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
           >
             <div *ngFor="let kv of objToPairs(attrs)" class="kv">
               <span class="k">{{ kv[0] }}:</span>
-              <!-- Booleanos en color -->
               <span
                 class="v"
                 [class.v-true]="kv[1] === true"
                 [class.v-false]="kv[1] === false"
+                >{{ kv[1] }}</span
               >
-                {{ kv[1] }}
-              </span>
             </div>
+          </div>
+          <div
+            class="array-badges"
+            *ngIf="node()?.jsonMeta?.arrayCounts as arrs"
+          >
+            <ng-container *ngFor="let e of objToPairs(arrs)">
+              <span class="arr-badge">
+                {{ e[0] }}: {{ e[1] }} {{ e[1] === 1 ? 'item' : 'items' }}
+              </span>
+            </ng-container>
           </div>
         </div>
       </ng-template>
@@ -124,6 +132,25 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
         color: #b71c1c;
         font-weight: 600;
       }
+      array-badges {
+        margin-top: 6px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .arr-badge {
+        font-size: 10px;
+        background: #eef2ff;
+        color: #3730a3;
+        padding: 2px 6px;
+        border-radius: 999px;
+      }
+      .schema-card {
+        word-break: break-word;
+      } /* 👈 evita corte horizontal del CAI */
+      .card-title {
+        white-space: normal;
+      } /* por si quedaba en una línea */
     `,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -131,7 +158,11 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
 export class SchemaCardComponent {
   node = input.required<SchemaNode>();
   cardTemplate = input<TemplateRef<any> | null>(null);
-  options = input<SchemaOptions>(DEFAULT_OPTIONS); // 👈 recibir opciones
+  options = input<SchemaOptions>(DEFAULT_OPTIONS);
+
+  showTitle(): boolean {
+    return (this.options().titleMode ?? 'auto') !== 'none';
+  }
 
   @Output() nodeClick = new EventEmitter<SchemaNode>();
 

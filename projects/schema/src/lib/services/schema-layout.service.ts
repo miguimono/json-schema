@@ -14,8 +14,8 @@ export class SchemaLayoutService {
   ): Promise<NormalizedGraph> {
     const options: SchemaOptions = { ...DEFAULT_OPTIONS, ...opts };
 
-    const align = options.layoutAlign === 'firstChild' ? 'LEFT' : 'CENTER';
-    const placementStrategy = 'BRANDES_KOEPF'; // necesario para bk.*
+    const dir = options.layoutDirection ?? 'RIGHT';
+    const placementStrategy = 'BRANDES_KOEPF';
     const fixedAlign =
       options.layoutAlign === 'firstChild' ? 'LEFTUP' : 'BALANCED';
 
@@ -23,10 +23,10 @@ export class SchemaLayoutService {
       id: 'root',
       layoutOptions: {
         'elk.algorithm': 'layered',
-        'elk.direction': 'RIGHT',
+        'elk.direction': dir,
         'elk.layered.nodePlacement.strategy': placementStrategy, // 👈
         'elk.layered.nodePlacement.bk.fixedAlignment': fixedAlign, // 👈 'LEFTUP' | 'BALANCED'
-        'elk.layered.spacing.nodeNodeBetweenLayers': '48',
+        'elk.layered.spacing.nodeNodeBetweenLayers': '64',
         'elk.spacing.nodeNode': '32',
         'elk.edgeRouting': 'ORTHOGONAL',
         // ayuda a estabilidad visual

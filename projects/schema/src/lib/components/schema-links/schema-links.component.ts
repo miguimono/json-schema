@@ -56,26 +56,24 @@ export class SchemaLinksComponent {
   @Output() linkClick = new EventEmitter<SchemaEdge>();
   pathFor(e: SchemaEdge): string {
     const pts = e.points ?? [];
-    const style = this.options().linkStyle ?? 'orthogonal';
+    const { linkStyle = 'orthogonal', curveTension = 80 } = this.options();
     if (pts.length === 0) return '';
 
-    if (style === 'line') {
+    if (linkStyle === 'curve') {
+      const a = pts[0],
+        b = pts[pts.length - 1];
+      const dx = b.x - a.x;
+      const t = Math.max(20, Math.min(200, curveTension)); // 👈 ahora configurable
+      const c1x = a.x + Math.sign(dx || 1) * t,
+        c1y = a.y;
+      const c2x = b.x - Math.sign(dx || 1) * t,
+        c2y = b.y;
+      return `M ${a.x},${a.y} C ${c1x},${c1y} ${c2x},${c2y} ${b.x},${b.y}`;
+    }
+    if (linkStyle === 'line') {
       const a = pts[0],
         b = pts[pts.length - 1];
       return `M ${a.x},${a.y} L ${b.x},${b.y}`;
-    }
-
-    if (style === 'curve') {
-      const a = pts[0],
-        b = pts[pts.length - 1];
-      const dx = b.x - a.x,
-        dy = b.y - a.y;
-      const t = Math.max(40, Math.min(200, Math.abs(dx) * 0.35)); // suavidad controlada
-      const c1x = a.x + t,
-        c1y = a.y;
-      const c2x = b.x - t,
-        c2y = b.y;
-      return `M ${a.x},${a.y} C ${c1x},${c1y} ${c2x},${c2y} ${b.x},${b.y}`;
     }
 
     // orthogonal (polyline de ELK)
