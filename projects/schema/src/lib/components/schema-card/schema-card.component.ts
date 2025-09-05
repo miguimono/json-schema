@@ -24,13 +24,6 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
       [style.height.px]="node()?.height"
       (click)="onClick($event)"
     >
-      <div
-        class="card-badge"
-        *ngIf="(node()?.jsonMeta?.childrenCount ?? 0) > 0"
-      >
-        {{ node()?.jsonMeta?.childrenCount }} hijos
-      </div>
-
       <ng-container
         *ngIf="cardTemplate(); else defaultTpl"
         [ngTemplateOutlet]="cardTemplate()"
@@ -39,6 +32,13 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
       </ng-container>
 
       <ng-template #defaultTpl>
+        <div
+          class="card-badge"
+          *ngIf="(node()?.jsonMeta?.childrenCount ?? 0) > 0"
+        >
+          {{ node()?.jsonMeta?.childrenCount }} hijos
+        </div>
+
         <div class="card-body">
           <div class="card-title">
             {{ node()?.jsonMeta?.title || node()?.label }}
@@ -47,12 +47,16 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
             class="card-preview"
             *ngIf="node()?.jsonMeta?.attributes as attrs"
           >
-            <div
-              *ngFor="let kv of objToPairs(attrs) | slice : 0 : 12"
-              class="kv"
-            >
+            <div *ngFor="let kv of objToPairs(attrs)" class="kv">
               <span class="k">{{ kv[0] }}:</span>
-              <span class="v">{{ kv[1] }}</span>
+              <!-- Booleanos en color -->
+              <span
+                class="v"
+                [class.v-true]="kv[1] === true"
+                [class.v-false]="kv[1] === false"
+              >
+                {{ kv[1] }}
+              </span>
             </div>
           </div>
         </div>
@@ -97,6 +101,14 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
         opacity: 0.66;
         margin-right: 6px;
       }
+      .v-true {
+        color: #1b5e20;
+        font-weight: 600;
+      } /* verde */
+      .v-false {
+        color: #b71c1c;
+        font-weight: 600;
+      } /* rojo */
     `,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,

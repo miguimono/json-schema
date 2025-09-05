@@ -15,6 +15,8 @@ export class SchemaLayoutService {
     const options: SchemaOptions = { ...DEFAULT_OPTIONS, ...opts };
 
     const align = options.layoutAlign === 'firstChild' ? 'LEFT' : 'CENTER';
+    const fixedAlign =
+      options.layoutAlign === 'firstChild' ? 'LEFTUP' : 'CENTER';
 
     const elkGraph: any = {
       id: 'root',
@@ -23,8 +25,10 @@ export class SchemaLayoutService {
         'elk.direction': 'RIGHT',
         'elk.layered.spacing.nodeNodeBetweenLayers': '48',
         'elk.spacing.nodeNode': '32',
-        'elk.layered.nodePlacement.bk.fixedAlignment': align, // 👈
-        'elk.edgeRouting': 'ORTHOGONAL', // base, el estilo final lo maneja SchemaLinks
+        'elk.layered.nodePlacement.bk.fixedAlignment': fixedAlign, // 'LEFTUP' | 'CENTER'
+        'elk.edgeRouting': 'ORTHOGONAL', // base
+        'elk.layered.crossingMinimization.semiInteractive': 'true',
+        'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
       },
       children: graph.nodes.map((n) => ({
         id: n.id,

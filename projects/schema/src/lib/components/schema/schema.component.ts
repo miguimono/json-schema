@@ -110,6 +110,7 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
   edges = computed(() => this.graph().edges);
 
   @ViewChild('root', { static: true }) rootRef!: ElementRef<HTMLElement>;
+
   private scale = signal(1);
   private minScale = signal(0.2); // 👈 se recalcula tras layout
   private maxScale = signal(3);
@@ -140,10 +141,52 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
 
   private async compute(): Promise<void> {
     const normalized = this.adapter.normalize(this.data(), this.options());
-    const laid = await this.layoutService.layout(normalized, this.options());
-    console.log('nodes:', laid.nodes.length, 'edges:', laid.edges.length);
+    let laid = await this.layoutService.layout(normalized, this.options());
     this.graph.set(laid);
-    this.fitToView(); // 👈 ajusta minScale para ver todo
+    console.log('nodes:', laid.nodes.length, 'edges:', laid.edges.length);
+    await queueMicrotask(async () => {
+      const root = this.rootRef.nativeElement;
+      const cards = Array.from(
+        root.querySelectorAll<HTMLElement>('.schema-card')
+      );
+      let changed = false;
+
+      // mapa por id
+      const nodeMap = new Map(this.graph().nodes.map((n) => [n.id, n]));
+
+      for (const el of cards) {
+        const id = el.querySelector('.card-title')
+          ? (el.closest('.schema-card') as any)?.__nodeId
+          : null;
+        // como no tenemos __nodeId, usamos posición para encontrar el nodo más cercano
+        const rect = el.getBoundingClientRect();
+        const match = this.graph().nodes.find(
+          (n) =>
+            Math.abs((n.x ?? 0) - (el.offsetLeft ?? 0)) < 2 &&
+            Math.abs((n.y ?? 0) - (el.offsetTop ?? 0)) < 2
+        );
+        if (!match) continue;
+
+        const w = Math.ceil(el.scrollWidth);
+        const h = Math.ceil(el.scrollHeight);
+        if ((match.width ?? 0) !== w || (match.height ?? 0) !== h) {
+          match.width = w;
+          match.height = h;
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        laid = await this.layoutService.layout(
+          { ...this.graph() },
+          this.options()
+        );
+        this.graph.set(laid);
+      }
+
+      // Ajustar min zoom para encajar todo
+      this.fitToView();
+    });
   }
 
   private getViewportSize() {
