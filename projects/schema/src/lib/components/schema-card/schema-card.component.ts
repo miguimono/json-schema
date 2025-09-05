@@ -1,13 +1,20 @@
 // path: projects/schema/src/lib/schema-card.component.ts
 
-import { ChangeDetectionStrategy, Component, EventEmitter, Output, TemplateRef, input } from "@angular/core";
-import { SchemaNode } from "../../models";
-import { NgIf, NgTemplateOutlet } from "@angular/common";
+import {
+  ChangeDetectionStrategy,
+  Component,
+  EventEmitter,
+  Output,
+  TemplateRef,
+  input,
+} from '@angular/core';
+import { SchemaNode } from '../../models';
+import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
 
 @Component({
-  selector: "schema-card",
+  selector: 'schema-card',
   standalone: true,
-  imports: [NgIf, NgTemplateOutlet],
+  imports: [CommonModule, NgIf, NgTemplateOutlet],
   template: `
     <div
       class="schema-card"
@@ -17,6 +24,13 @@ import { NgIf, NgTemplateOutlet } from "@angular/common";
       [style.height.px]="node()?.height"
       (click)="onClick($event)"
     >
+      <div
+        class="card-badge"
+        *ngIf="(node()?.jsonMeta?.childrenCount ?? 0) > 0"
+      >
+        {{ node()?.jsonMeta?.childrenCount }} hijos
+      </div>
+
       <ng-container
         *ngIf="cardTemplate(); else defaultTpl"
         [ngTemplateOutlet]="cardTemplate()"
@@ -26,13 +40,20 @@ import { NgIf, NgTemplateOutlet } from "@angular/common";
 
       <ng-template #defaultTpl>
         <div class="card-body">
-          <div class="card-title">{{ node()?.jsonMeta?.title || node()?.label }}</div>
-          <div class="card-preview" *ngIf="node()?.jsonMeta?.attributes as attrs">
-            <div *ngFor="let kv of objToPairs(attrs) | slice: 0 : 4" class="kv">
+          <div class="card-title">
+            {{ node()?.jsonMeta?.title || node()?.label }}
+          </div>
+          <div
+            class="card-preview"
+            *ngIf="node()?.jsonMeta?.attributes as attrs"
+          >
+            <div
+              *ngFor="let kv of objToPairs(attrs) | slice : 0 : 12"
+              class="kv"
+            >
               <span class="k">{{ kv[0] }}:</span>
               <span class="v">{{ kv[1] }}</span>
             </div>
-            <div class="more" *ngIf="objLen(attrs) > 4">+{{ objLen(attrs) - 4 }} más</div>
           </div>
         </div>
       </ng-template>
@@ -46,9 +67,18 @@ import { NgIf, NgTemplateOutlet } from "@angular/common";
         border: 1px solid rgba(0, 0, 0, 0.08);
         background: #fff;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-        cursor: default;
         overflow: hidden;
         user-select: none;
+      }
+      .card-badge {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        font-size: 10px;
+        background: #eef6ff;
+        color: #2563eb;
+        padding: 2px 6px;
+        border-radius: 999px;
       }
       .card-body {
         padding: 10px;
@@ -66,11 +96,6 @@ import { NgIf, NgTemplateOutlet } from "@angular/common";
       .kv .k {
         opacity: 0.66;
         margin-right: 6px;
-      }
-      .more {
-        font-size: 10px;
-        opacity: 0.6;
-        margin-top: 4px;
       }
     `,
   ],

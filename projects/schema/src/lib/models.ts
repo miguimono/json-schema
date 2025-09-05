@@ -1,16 +1,20 @@
 // path: projects/schema/src/lib/models.ts
 
-import { TemplateRef } from "@angular/core";
+import { TemplateRef } from '@angular/core';
+
+export type LayoutAlign = 'firstChild' | 'center';
+export type LinkStyle = 'orthogonal' | 'curve' | 'line';
 
 export interface SchemaNode {
-  id: string; // JSONPath estable
-  label: string; // Título resuelto por prioridad
-  jsonPath: string; // Mismo que id, explícito
+  id: string;
+  label: string;
+  jsonPath: string;
   data: Record<string, any>;
   jsonMeta?: {
     title?: string;
-    attributes?: Record<string, any>; // Solo escalares (y/o arrays de escalares)
+    attributes?: Record<string, any>;
     preview?: string;
+    childrenCount?: number; // 👈 cantidad de hijos objeto/híbridos
   };
   x?: number;
   y?: number;
@@ -52,7 +56,7 @@ export interface SchemaOptions {
   maxDepth: number | null;
 
   /** Estrategia id: fija a jsonpath para estabilidad */
-  nodeIdStrategy: "jsonpath";
+  nodeIdStrategy: 'jsonpath';
 
   /** Límite de claves en preview por card */
   previewMaxKeys: number;
@@ -66,19 +70,23 @@ export interface SchemaOptions {
   /** Estilo de links (passthrough a UI) */
   linkStroke?: string;
   linkStrokeWidth?: number;
+  layoutAlign?: LayoutAlign; // 'firstChild' | 'center'
+  linkStyle?: LinkStyle; // 'orthogonal' | 'curve' | 'line'
 }
 
 export const DEFAULT_OPTIONS: SchemaOptions = {
-  titleKeyPriority: ["name", "title", "id", "label"], // se sobreescribe desde el wrapper con jsonTitleKeys
-  hiddenKeysGlobal: [], // puedes ocultar: ['data','items','children'] etc.
+  titleKeyPriority: ['name', 'title', 'id', 'label'],
+  hiddenKeysGlobal: [],
   collapseArrayContainers: true,
   collapseSingleChildWrappers: true,
   edgeLabelFromContainerKey: false,
   maxDepth: null,
-  nodeIdStrategy: "jsonpath",
+  nodeIdStrategy: 'jsonpath',
   previewMaxKeys: 4,
   treatScalarArraysAsAttribute: true,
   defaultNodeSize: { width: 220, height: 96 },
-  linkStroke: "#4CAF50",
+  linkStroke: '#4CAF50',
   linkStrokeWidth: 1.25,
+  layoutAlign: 'center',
+  linkStyle: 'orthogonal',
 };
