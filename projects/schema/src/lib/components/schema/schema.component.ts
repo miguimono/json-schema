@@ -64,6 +64,7 @@ import { SchemaLinksComponent } from '../schema-links/schema-links.component';
         <ng-container *ngFor="let n of nodes()">
           <schema-card
             [node]="n"
+            [options]="options()"
             [cardTemplate]="cardTemplate()"
             (nodeClick)="nodeClick.emit($event)"
           ></schema-card>

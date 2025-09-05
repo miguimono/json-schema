@@ -15,20 +15,22 @@ export class SchemaLayoutService {
     const options: SchemaOptions = { ...DEFAULT_OPTIONS, ...opts };
 
     const align = options.layoutAlign === 'firstChild' ? 'LEFT' : 'CENTER';
+    const placementStrategy = 'BRANDES_KOEPF'; // necesario para bk.*
     const fixedAlign =
-      options.layoutAlign === 'firstChild' ? 'LEFTUP' : 'CENTER';
+      options.layoutAlign === 'firstChild' ? 'LEFTUP' : 'BALANCED';
 
     const elkGraph: any = {
       id: 'root',
       layoutOptions: {
         'elk.algorithm': 'layered',
         'elk.direction': 'RIGHT',
+        'elk.layered.nodePlacement.strategy': placementStrategy, // 👈
+        'elk.layered.nodePlacement.bk.fixedAlignment': fixedAlign, // 👈 'LEFTUP' | 'BALANCED'
         'elk.layered.spacing.nodeNodeBetweenLayers': '48',
         'elk.spacing.nodeNode': '32',
-        'elk.layered.nodePlacement.bk.fixedAlignment': fixedAlign, // 'LEFTUP' | 'CENTER'
-        'elk.edgeRouting': 'ORTHOGONAL', // base
-        'elk.layered.crossingMinimization.semiInteractive': 'true',
-        'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
+        'elk.edgeRouting': 'ORTHOGONAL',
+        // ayuda a estabilidad visual
+        'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
       },
       children: graph.nodes.map((n) => ({
         id: n.id,

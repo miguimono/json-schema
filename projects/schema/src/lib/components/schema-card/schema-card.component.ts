@@ -8,7 +8,7 @@ import {
   TemplateRef,
   input,
 } from '@angular/core';
-import { SchemaNode } from '../../models';
+import { DEFAULT_OPTIONS, SchemaNode, SchemaOptions } from '../../models';
 import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
 
 @Component({
@@ -18,6 +18,7 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
   template: `
     <div
       class="schema-card"
+      [ngClass]="getAccentClass()"
       [style.left.px]="node()?.x"
       [style.top.px]="node()?.y"
       [style.width.px]="node()?.width"
@@ -101,14 +102,28 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
         opacity: 0.66;
         margin-right: 6px;
       }
+      .schema-card {
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        background: #fff;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        border-radius: 10px;
+      }
+      .schema-card.accent-true {
+        border-color: #1b5e20;
+        box-shadow: 0 2px 10px rgba(27, 94, 32, 0.15);
+      }
+      .schema-card.accent-false {
+        border-color: #b71c1c;
+        box-shadow: 0 2px 10px rgba(183, 28, 28, 0.15);
+      }
       .v-true {
         color: #1b5e20;
         font-weight: 600;
-      } /* verde */
+      }
       .v-false {
         color: #b71c1c;
         font-weight: 600;
-      } /* rojo */
+      }
     `,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -116,6 +131,7 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
 export class SchemaCardComponent {
   node = input.required<SchemaNode>();
   cardTemplate = input<TemplateRef<any> | null>(null);
+  options = input<SchemaOptions>(DEFAULT_OPTIONS); // 👈 recibir opciones
 
   @Output() nodeClick = new EventEmitter<SchemaNode>();
 
@@ -129,5 +145,15 @@ export class SchemaCardComponent {
   }
   objLen(obj: Record<string, any>) {
     return Object.keys(obj).length;
+  }
+  // helper para clase de acento
+  getAccentClass(): string {
+    const opt = this.options();
+    const k = opt.accentByKey;
+    if (!k) return '';
+    const v = this.node()?.data?.[k];
+    if (v === true) return 'accent-true';
+    if (v === false) return 'accent-false';
+    return '';
   }
 }

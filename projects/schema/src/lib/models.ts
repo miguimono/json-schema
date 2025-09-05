@@ -72,6 +72,7 @@ export interface SchemaOptions {
   linkStrokeWidth?: number;
   layoutAlign?: LayoutAlign; // 'firstChild' | 'center'
   linkStyle?: LinkStyle; // 'orthogonal' | 'curve' | 'line'
+  accentByKey?: string | null; // 👈 nueva
 }
 
 export const DEFAULT_OPTIONS: SchemaOptions = {
@@ -89,4 +90,5 @@ export const DEFAULT_OPTIONS: SchemaOptions = {
   linkStrokeWidth: 1.25,
   layoutAlign: 'center',
   linkStyle: 'orthogonal',
+  accentByKey: null,
 };
