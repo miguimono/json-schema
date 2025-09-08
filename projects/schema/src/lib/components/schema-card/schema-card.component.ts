@@ -24,6 +24,7 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
       [style.width.px]="node()?.width"
       [style.height.px]="node()?.height"
       (click)="onClick($event)"
+      style="z-index: 1;"
     >
       <ng-container
         *ngIf="cardTemplate(); else defaultTpl"
@@ -33,9 +34,12 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
       </ng-container>
 
       <ng-template #defaultTpl>
+        <!-- <div class="card-badge" *ngIf="(node()?.jsonMeta?.childrenCount ?? 0) > 0">
+          {{ node()?.jsonMeta?.childrenCount }} hijos
+        </div> -->
         <div class="card-body">
           <div class="card-title" *ngIf="showTitle()">
-            {{ node()?.jsonMeta?.title || node()?.label }}
+            {{ node()?.jsonMeta?.title || node()?.label }} // XXX
           </div>
           <div
             class="card-preview"

@@ -31,14 +31,7 @@ import { SchemaLinksComponent } from '../schema-links/schema-links.component';
 @Component({
   selector: 'schema',
   standalone: true,
-  imports: [
-    CommonModule,
-    NgFor,
-    NgIf,
-    NgTemplateOutlet,
-    SchemaCardComponent,
-    SchemaLinksComponent,
-  ],
+  imports: [CommonModule, NgFor, SchemaCardComponent, SchemaLinksComponent],
   template: `
     <div
       class="schema-root"

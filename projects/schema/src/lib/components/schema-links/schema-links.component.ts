@@ -36,6 +36,7 @@ import { SchemaEdge, SchemaOptions, DEFAULT_OPTIONS } from '../../models';
         top: 0;
         pointer-events: auto;
         overflow: visible;
+        z-index: 0;
       }
       path {
         cursor: pointer;
@@ -63,13 +64,26 @@ export class SchemaLinksComponent {
       const a = pts[0],
         b = pts[pts.length - 1];
       const dx = b.x - a.x;
-      const t = Math.max(20, Math.min(200, curveTension)); // 👈 ahora configurable
-      const c1x = a.x + Math.sign(dx || 1) * t,
+      const dy = b.y - a.y;
+
+      const t = Math.max(20, Math.min(200, curveTension)); // tensión horizontal
+      const bow = Math.max(12, Math.min(120, t * 0.6)); // “panza” vertical mínima
+
+      // puntos de control base (horizontales)
+      let c1x = a.x + Math.sign(dx || 1) * t,
         c1y = a.y;
-      const c2x = b.x - Math.sign(dx || 1) * t,
+      let c2x = b.x - Math.sign(dx || 1) * t,
         c2y = b.y;
+
+      // 👇 Si están en la misma línea horizontal, forzamos curvatura vertical
+      if (Math.abs(dy) < 1) {
+        c1y = a.y - bow;
+        c2y = b.y + bow;
+      }
+
       return `M ${a.x},${a.y} C ${c1x},${c1y} ${c2x},${c2y} ${b.x},${b.y}`;
     }
+
     if (linkStyle === 'line') {
       const a = pts[0],
         b = pts[pts.length - 1];
