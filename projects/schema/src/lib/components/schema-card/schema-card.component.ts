@@ -1,12 +1,6 @@
 // ============================================
 // projects/schema/src/lib/schema-card.component.ts
-// ============================================
-// Componente de tarjeta (card) para un nodo del grafo.
-// - Posiciona la card con left/top/width/height provenientes del nodo.
-// - Render por defecto con título, atributos y "array badges" (k: N items).
-// - Soporta un TemplateRef externo (cardTemplate) para personalizar el contenido.
-// - Emite nodeClick al hacer click en la card (propagación detenida).
-// Este archivo añade documentación JSDoc sin cambiar la lógica.
+// v0.3.7-debug — añade outline visual en modo debug
 // ============================================
 
 import {
@@ -27,11 +21,15 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
   template: `
     <div
       class="schema-card"
+      [class.debug-outline]="options().debug?.paintBounds"
+      [attr.data-node-id]="node()?.id"
       [ngClass]="getAccentClass()"
       [style.left.px]="node()?.x"
       [style.top.px]="node()?.y"
       [style.width.px]="node()?.width"
       [style.height.px]="node()?.height"
+      [style.maxWidth.px]="options().maxCardWidth ?? null"
+      [style.maxHeight.px]="options().maxCardHeight ?? null"
       (click)="onClick($event)"
       style="z-index: 1;"
     >
@@ -39,15 +37,14 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
         *ngIf="cardTemplate(); else defaultTpl"
         [ngTemplateOutlet]="cardTemplate()"
         [ngTemplateOutletContext]="{ $implicit: node() }"
-      >
-      </ng-container>
+      ></ng-container>
 
       <ng-template #defaultTpl>
-        <!-- (El badge redundante "N hijos" fue eliminado) -->
         <div class="card-body">
           <div class="card-title" *ngIf="showTitle()">
             {{ node()?.jsonMeta?.title || node()?.label }}
           </div>
+
           <div
             class="card-preview"
             *ngIf="node()?.jsonMeta?.attributes as attrs"
@@ -58,10 +55,13 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
                 class="v"
                 [class.v-true]="kv[1] === true"
                 [class.v-false]="kv[1] === false"
-                >{{ kv[1] }}</span
+                [class.nowrap]="isNoWrapKey(kv[0])"
               >
+                {{ kv[1] }}
+              </span>
             </div>
           </div>
+
           <div
             class="array-badges"
             *ngIf="node()?.jsonMeta?.arrayCounts as arrs"
@@ -84,19 +84,15 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
         border: 1px solid rgba(0, 0, 0, 0.08);
         background: #fff;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-        overflow: hidden;
         user-select: none;
+        word-break: break-word;
+        overflow: hidden;
       }
-      .card-badge {
-        position: absolute;
-        top: 6px;
-        right: 8px;
-        font-size: 10px;
-        background: #eef6ff;
-        color: #2563eb;
-        padding: 2px 6px;
-        border-radius: 999px;
+      .debug-outline {
+        outline: 2px dashed #ef4444;
+        outline-offset: 0;
       }
+
       .card-body {
         padding: 10px;
       }
@@ -107,26 +103,15 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
       }
       .card-preview {
         font-size: 11px;
-        opacity: 0.85;
-        line-height: 1.3;
+        line-height: 1.35;
       }
-      .kv .k {
+      .kv {
+        display: block;
+        margin: 2px 0;
+      }
+      .k {
         opacity: 0.66;
         margin-right: 6px;
-      }
-      .schema-card {
-        border: 1px solid rgba(0, 0, 0, 0.08);
-        background: #fff;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-        border-radius: 10px;
-      }
-      .schema-card.accent-true {
-        border-color: #5dbe3f;
-        box-shadow: 0 2px 10px rgba(27, 94, 32, 0.15);
-      }
-      .schema-card.accent-false {
-        border-color: #d41818;
-        box-shadow: 0 2px 10px rgba(183, 28, 28, 0.15);
       }
       .v-true {
         color: #5dbe3f;
@@ -136,7 +121,8 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
         color: #d41818;
         font-weight: 600;
       }
-      array-badges {
+
+      .array-badges {
         margin-top: 6px;
         display: flex;
         flex-wrap: wrap;
@@ -149,90 +135,51 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
         padding: 2px 6px;
         border-radius: 999px;
       }
-      .schema-card {
-        word-break: break-word;
-      } /* 👈 evita corte horizontal del CAI */
-      .card-title {
-        white-space: normal;
-      } /* por si quedaba en una línea */
+      .nowrap {
+        white-space: nowrap;
+        display: inline-block;
+        max-width: 100%;
+      }
+
+      .schema-card.accent-true {
+        border-color: #5dbe3f;
+        box-shadow: 0 2px 10px rgba(27, 94, 32, 0.15);
+      }
+      .schema-card.accent-false {
+        border-color: #d41818;
+        box-shadow: 0 2px 10px rgba(183, 28, 28, 0.15);
+      }
     `,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SchemaCardComponent {
-  // ===========================
-  // Inputs
-  // ===========================
-
-  /** Nodo a representar: define posición (x,y), tamaño (width,height) y metadatos. */
   node = input.required<SchemaNode>();
-
-  /**
-   * Template opcional para personalizar el contenido interno de la card.
-   * - Si es `null`, se usa el template por defecto (título, atributos, array badges).
-   * - El contexto inyecta `node` como $implicit.
-   */
   cardTemplate = input<TemplateRef<any> | null>(null);
-
-  /** Opciones visuales/semánticas que afectan el render de la card. */
   options = input<SchemaOptions>(DEFAULT_OPTIONS);
 
-  // ===========================
-  // Outputs
-  // ===========================
-
-  /** Click sobre la card; se emite el SchemaNode asociado. */
   @Output() nodeClick = new EventEmitter<SchemaNode>();
 
-  // ===========================
-  // Render helpers / lógica UI
-  // ===========================
-
-  /**
-   * Determina si se muestra el título de la card según `options.titleMode`.
-   * @returns true si el título debe mostrarse; false para ocultarlo.
-   */
   showTitle(): boolean {
     return (this.options().titleMode ?? 'auto') !== 'none';
   }
-
-  /**
-   * Maneja el click en la card:
-   * - Detiene la propagación para no disparar eventos del lienzo.
-   * - Emite `nodeClick` con el nodo actual.
-   */
   onClick(event: MouseEvent) {
     event.stopPropagation();
     this.nodeClick.emit(this.node()!);
   }
-
-  /**
-   * Convierte un objeto en una lista de pares [k, v] para *ngFor.
-   */
   objToPairs(obj: Record<string, any>) {
     return Object.entries(obj);
   }
-
-  /**
-   * Devuelve la cantidad de claves de un objeto (utilidad de UI).
-   */
-  objLen(obj: Record<string, any>) {
-    return Object.keys(obj).length;
-  }
-
-  /**
-   * Devuelve la clase de acento visual según `options.accentByKey`:
-   * - "accent-true" si el valor es exactamente `true`
-   * - "accent-false" si el valor es exactamente `false`
-   * - "" en cualquier otro caso
-   */
   getAccentClass(): string {
-    const opt = this.options();
-    const k = opt.accentByKey;
+    const k = this.options().accentByKey;
     if (!k) return '';
     const v = this.node()?.data?.[k];
     if (v === true) return 'accent-true';
     if (v === false) return 'accent-false';
     return '';
+  }
+  isNoWrapKey(key: string): boolean {
+    const list = this.options().noWrapKeys ?? [];
+    return list.includes(key);
   }
 }
