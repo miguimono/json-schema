@@ -385,4 +385,40 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     this.tx.set(targetX);
     this.ty.set(targetY);
   }
+  /**
+   * Aplica un zoom relativo manteniendo estable un punto de origen en pantalla.
+   * @param factor >1 para zoom in, <1 para zoom out
+   * @param origin punto {x,y} en coords relativas al root; por defecto, centro del viewport
+   */
+  public zoomBy(factor: number, origin?: { x: number; y: number }) {
+    const root = this.rootRef?.nativeElement;
+    if (!root) return;
+
+    const rect = root.getBoundingClientRect();
+    const mouseX = origin?.x ?? rect.width / 2;
+    const mouseY = origin?.y ?? rect.height / 2;
+
+    const oldScale = this.scale();
+    const newScale = Math.max(
+      this.minScale(),
+      Math.min(this.maxScale(), oldScale * factor)
+    );
+
+    // Mantener fijo el punto de origen (pantalla → mundo → pantalla)
+    const worldX = (mouseX - this.tx()) / oldScale;
+    const worldY = (mouseY - this.ty()) / oldScale;
+    this.tx.set(mouseX - worldX * newScale);
+    this.ty.set(mouseY - worldY * newScale);
+    this.scale.set(newScale);
+  }
+
+  public zoomIn() {
+    this.zoomBy(1.1);
+  }
+  public zoomOut() {
+    this.zoomBy(1 / 1.1);
+  }
+  public resetView() {
+    this.onDblClick();
+  }
 }

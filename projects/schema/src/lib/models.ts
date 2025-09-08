@@ -55,6 +55,8 @@ export interface SchemaNode {
   width?: number;
   /** Alto (puede ajustarse tras medir DOM). */
   height?: number;
+  /**  */
+  linkStyle?: LinkStyle;
 }
 
 /**
@@ -178,8 +180,8 @@ export const DEFAULT_OPTIONS: SchemaOptions = {
   treatScalarArraysAsAttribute: true,
   defaultNodeSize: { width: 220, height: 96 },
 
-  linkStroke: '#4CAF50',
-  linkStrokeWidth: 1.25,
+  linkStroke: '#019df4',
+  linkStrokeWidth: 2,
 
   layoutAlign: 'center',
   linkStyle: 'orthogonal',
