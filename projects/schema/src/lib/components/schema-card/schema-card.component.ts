@@ -1,6 +1,5 @@
 // ============================================
-// projects/schema/src/lib/schema-card.component.ts
-// v0.3.7-debug — añade outline visual en modo debug
+// projects/schema/src/lib/schema-card.component.ts — v0.3.8.2
 // ============================================
 
 import {
@@ -80,12 +79,14 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
     `
       .schema-card {
         position: absolute;
-        border-radius: 10px;
+        border-radius: 12px;
         border: 1px solid rgba(0, 0, 0, 0.08);
         background: #fff;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
         user-select: none;
-        word-break: break-word;
+        /* importante: NO forzar cortes globales; que decida el contenido */
+        word-break: normal;
+        overflow-wrap: normal;
         overflow: hidden;
       }
       .debug-outline {
@@ -94,15 +95,15 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
       }
 
       .card-body {
-        padding: 10px;
+        padding: 12px;
       }
       .card-title {
-        font-weight: 600;
-        font-size: 13px;
+        font-weight: 700;
+        font-size: 14px;
         margin-bottom: 6px;
       }
       .card-preview {
-        font-size: 11px;
+        font-size: 12px;
         line-height: 1.35;
       }
       .kv {
@@ -114,12 +115,12 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
         margin-right: 6px;
       }
       .v-true {
-        color: #5dbe3f;
-        font-weight: 600;
+        color: #16a34a;
+        font-weight: 700;
       }
       .v-false {
-        color: #d41818;
-        font-weight: 600;
+        color: #dc2626;
+        font-weight: 700;
       }
 
       .array-badges {
@@ -135,19 +136,21 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
         padding: 2px 6px;
         border-radius: 999px;
       }
+
+      /* 👇 Esto evita que CAI/port_name se partan en varias líneas */
       .nowrap {
         white-space: nowrap;
-        display: inline-block;
-        max-width: 100%;
+        word-break: normal !important;
+        overflow-wrap: normal !important;
       }
 
       .schema-card.accent-true {
-        border-color: #5dbe3f;
-        box-shadow: 0 2px 10px rgba(27, 94, 32, 0.15);
+        border-color: #16a34a;
+        box-shadow: 0 2px 10px rgba(22, 163, 74, 0.15);
       }
       .schema-card.accent-false {
-        border-color: #d41818;
-        box-shadow: 0 2px 10px rgba(183, 28, 28, 0.15);
+        border-color: #dc2626;
+        box-shadow: 0 2px 10px rgba(220, 38, 38, 0.15);
       }
     `,
   ],

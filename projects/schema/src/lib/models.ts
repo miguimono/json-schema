@@ -1,6 +1,5 @@
 // ============================================
-// projects/schema/src/lib/models.ts
-// v0.3.7-debug — añade opciones de debug
+// projects/schema/src/lib/models.ts — v0.3.8.2
 // ============================================
 
 export type LayoutAlign = 'firstChild' | 'center';
@@ -72,15 +71,17 @@ export interface SchemaOptions {
   maxCardHeight?: number | null;
   noWrapKeys?: string[];
 
-  // 🔍 DEBUG
+  /** Alinear hijos inmediatos del primer nodo visible (root). */
+  snapRootChildrenY?: boolean;
+
+  /** NUEVO: Alinear cada tramo de una cadena (1→1) para que quede horizontal. */
+  snapChainSegmentsY?: boolean;
+
+  // DEBUG
   debug?: {
-    /** Loggea mediciones por consola (console.table) */
     measure?: boolean;
-    /** Loggea antes/después de layout (tamaños, cambios) */
     layout?: boolean;
-    /** Pinta outline de las cards para ver sus bounds reales */
     paintBounds?: boolean;
-    /** Expone el componente en window.schemaDebug para comandos manuales */
     exposeOnWindow?: boolean;
   };
 }
@@ -95,7 +96,9 @@ export const DEFAULT_OPTIONS: SchemaOptions = {
   nodeIdStrategy: 'jsonpath',
   previewMaxKeys: 4,
   treatScalarArraysAsAttribute: true,
-  defaultNodeSize: { width: 220, height: 96 },
+
+  // un poco más ancha de base
+  defaultNodeSize: { width: 260, height: 96 },
 
   linkStroke: '#4CAF50',
   linkStrokeWidth: 1.25,
@@ -107,12 +110,15 @@ export const DEFAULT_OPTIONS: SchemaOptions = {
   layoutDirection: 'RIGHT',
   straightThresholdDx: 160,
 
+  // auto-resize y SIN tope de ancho para que pueda crecer
   autoResizeCards: true,
-  maxCardWidth: 560,
+  maxCardWidth: null, // <- deja que el contenido haga crecer la card
   maxCardHeight: null,
-  noWrapKeys: ['cto_name', 'cai'],
+  noWrapKeys: ['cto_name', 'cai', 'port_name'],
 
-  // DEBUG por defecto apagado
+  snapRootChildrenY: false, // lo dejamos off; usaremos snapChainSegmentsY
+  snapChainSegmentsY: true, // <- activa alineación por cadena 1→1
+
   debug: {
     measure: false,
     layout: false,
