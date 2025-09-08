@@ -1,7 +1,3 @@
-// ============================================
-// projects/schema/src/lib/schema-card.component.ts — v0.3.8.5
-// ============================================
-
 import {
   ChangeDetectionStrategy,
   Component,
@@ -94,39 +90,34 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
         outline-offset: 0;
       }
 
-      /* + aire lateral (derecha más generoso) */
       .card-body {
-        padding: 12px 22px;
+        padding: 12px 20px;
       }
-
       .card-title {
         font-weight: 700;
         font-size: 14px;
         margin-bottom: 6px;
       }
 
-      /* Filas key:value como grid estable */
+      /* 🔧 Grid compacto: la card se ENCOGE a su contenido */
       .card-preview {
         font-size: 12px;
         line-height: 1.28;
       }
       .kv {
         display: grid;
-        grid-template-columns: max-content 1fr;
-        column-gap: 10px; /* +gap entre clave y valor */
+        grid-template-columns: max-content max-content; /* <- antes: max-content 1fr */
+        column-gap: 10px;
         align-items: baseline;
         margin: 3px 0;
-        padding-right: 8px; /* guarda interior contra el borde derecho */
+        padding-right: 8px;
       }
 
-      /* Clave: legible, consistente */
       .k {
         opacity: 0.66;
         font-weight: 600;
         font-size: 12px;
       }
-
-      /* Valor: un poco menor + guard derecho explícito */
       .v {
         font-size: 10.75px;
         line-height: 1.25;
@@ -159,7 +150,7 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
         border-radius: 999px;
       }
 
-      /* Claves que NO deben partirse: fuerzan ensanche de la card */
+      /* No partir estas claves: fuerzan ensanche solo cuando lo necesitan */
       .nowrap {
         white-space: nowrap !important;
         word-break: keep-all !important;
