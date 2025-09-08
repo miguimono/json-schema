@@ -1,4 +1,18 @@
-// path: projects/schema/src/lib/json-adapter.service.ts
+// ============================================
+// projects/schema/src/lib/json-adapter.service.ts
+// ============================================
+// Transforma un JSON arbitrario en un grafo genérico (nodes/edges) independiente del dominio.
+// Reglas principales del modelado:
+//  - Un "nodo" (entidad) es cualquier objeto que tenga al menos un escalar (string/number/boolean).
+//  - El título del nodo se elige por prioridad (`titleKeyPriority`) o por el primer escalar encontrado.
+//  - Los atributos "preview" incluyen escalares (y arrays de escalares si está habilitado),
+//    excluyendo claves en `hiddenKeysGlobal` y, opcionalmente, el título usado.
+//  - Se crean aristas padre→hijo para objetos/elementos no escalares.
+//  - Se registran conteos de arrays no escalares en `jsonMeta.arrayCounts` (para "k: N items").
+//  - Soporta colapso de "wrappers" vacíos con un único hijo objeto (si `collapseSingleChildWrappers`).
+//
+// No modifica lógica: solo añade documentación JSDoc.
+// ============================================
 
 import { Injectable } from '@angular/core';
 import {
@@ -11,16 +25,32 @@ import {
 
 @Injectable({ providedIn: 'root' })
 export class JsonAdapterService {
+  /**
+   * Convierte un objeto JSON en un grafo normalizado y apto para layout/render.
+   *
+   * @param input JSON o sub-árbol a procesar.
+   * @param opts  Opciones parciales de `SchemaOptions` que sobrescriben los defaults.
+   * @returns     Grafo con listas de nodos y aristas.
+   */
   normalize(input: any, opts: Partial<SchemaOptions> = {}): NormalizedGraph {
     const options: SchemaOptions = { ...DEFAULT_OPTIONS, ...opts };
     const nodes: SchemaNode[] = [];
     const edges: SchemaEdge[] = [];
 
+    /** Determina si un valor es escalar (string/number/boolean o null). */
     const isScalar = (v: any) =>
       v === null || ['string', 'number', 'boolean'].includes(typeof v);
 
+    /** True si TODOS los elementos del array son escalares y hay al menos uno. */
     const arrayIsScalar = (arr: any[]) => arr.length > 0 && arr.every(isScalar);
 
+    /**
+     * Elige el título de una entidad:
+     *  1) Primer match por prioridad `priorities` con valor no vacío.
+     *  2) Si no hay prioridad, toma el primer escalar encontrado.
+     *  3) Si no hay, usa "Item".
+     * Devuelve además `usedKey` para evitar duplicarlo en atributos si hubo prioridad.
+     */
     const pickTitle = (obj: any, priorities: string[]) => {
       if (priorities.length) {
         for (const k of priorities) {
@@ -39,6 +69,14 @@ export class JsonAdapterService {
       return { title: 'Item', usedKey: undefined };
     };
 
+    /**
+     * Construye el objeto de atributos "preview" para la card:
+     *  - Incluye escalares.
+     *  - Incluye arrays de escalares si `treatScalarArraysAsAttribute` (como texto join).
+     *  - Excluye claves listadas en `hiddenKeysGlobal`.
+     *  - Si se usó una clave prioritaria para el título (usedTitleKey), la omite.
+     *  - Limita la cantidad a `previewMaxKeys`.
+     */
     const buildPreviewAttributes = (
       obj: any,
       usedTitleKey?: string,
@@ -59,12 +97,20 @@ export class JsonAdapterService {
       }
       return Object.fromEntries(entries.slice(0, options.previewMaxKeys));
     };
+
+    /** Un objeto es "entidad" si tiene al menos un escalar. */
     const isEntity = (obj: any): boolean => {
       if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
       // entidad si tiene algún escalar o si calzó prioridad (aunque ésta esté vacía)
       return Object.values(obj).some(isScalar);
     };
 
+    /**
+     * Detecta "wrappers" colapsables:
+     *  - Sin escalares.
+     *  - Con exactamente un hijo "objeto" (o array de objetos).
+     *  - Solo aplica si `collapseSingleChildWrappers` es true.
+     */
     const isCollapsibleWrapper = (obj: any): boolean => {
       if (!options.collapseSingleChildWrappers) return false;
       if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
@@ -84,6 +130,9 @@ export class JsonAdapterService {
       return objs === 1;
     };
 
+    /**
+     * Arma el mapa de conteos de arrays NO escalares (para pills "k: N items").
+     */
     const arrayCountsOf = (obj: any) => {
       const out: Record<string, number> = {};
       for (const [k, v] of Object.entries(obj ?? {})) {
@@ -95,6 +144,10 @@ export class JsonAdapterService {
       return out;
     };
 
+    /**
+     * Crea un nodo para el objeto `obj` y, si corresponde, crea la arista desde `parentId`.
+     * @returns id del nodo creado.
+     */
     const addNode = (jsonPath: string, obj: any, parentId?: string) => {
       const { title, usedKey } = pickTitle(obj, options.titleKeyPriority);
       const attrs = buildPreviewAttributes(obj, usedKey, options);
@@ -122,17 +175,28 @@ export class JsonAdapterService {
       return node.id;
     };
 
+    /** Contador auxiliar de hijos por nodo para rellenar `childrenCount`. */
     const childCounter = new Map<string, number>();
 
+    /**
+     * Recorrido DFS del JSON:
+     * - Arrays: itera por índice.
+     * - Objetos: crea nodo si es entidad; conecta aristas a hijos no escalares.
+     * - Respeta `maxDepth` (si no es null).
+     * - Colapsa wrappers si corresponde.
+     */
     const traverse = (val: any, path: string, parentId?: string, depth = 0) => {
       if (options.maxDepth !== null && depth > options.maxDepth) return;
+
       if (Array.isArray(val)) {
         val.forEach((c, i) =>
           traverse(c, `${path}[${i}]`, parentId, depth + 1)
         );
         return;
       }
+
       if (val && typeof val === 'object') {
+        // Wrapper colapsable: continúa con su único hijo objeto sin crear nodo.
         if (isCollapsibleWrapper(val)) {
           for (const [k, v] of Object.entries(val)) {
             if (v && typeof v === 'object') {
@@ -142,17 +206,24 @@ export class JsonAdapterService {
           }
           return;
         }
+
+        // Crear nodo si es entidad
         let myId = parentId;
         if (isEntity(val)) {
           myId = addNode(path, val, parentId);
           if (parentId)
             childCounter.set(parentId, (childCounter.get(parentId) ?? 0) + 1);
         }
+
+        // Recorrer hijos no escalares
         for (const [k, v] of Object.entries(val)) {
           if (isScalar(v)) continue;
+
           if (Array.isArray(v)) {
             const scalarArr = v.length > 0 && v.every(isScalar);
+            // arrays de escalares como atributo (si está habilitado) → no crea hijos
             if (scalarArr && options.treatScalarArraysAsAttribute) continue;
+
             v.forEach((c, i) =>
               traverse(c, `${path}.${k}[${i}]`, myId, depth + 1)
             );
@@ -163,10 +234,15 @@ export class JsonAdapterService {
       }
     };
 
+    // ---- Ejecución del recorrido
     traverse(input, '$', undefined, 0);
+
+    // ---- Completar childrenCount por nodo
     nodes.forEach(
       (n) => (n.jsonMeta!.childrenCount = childCounter.get(n.id) ?? 0)
     );
+
+    // ---- Grafo resultante
     return { nodes, edges, meta: {} };
   }
 }

@@ -1,4 +1,12 @@
-// path: projects/schema/src/lib/schema-links.component.ts
+// ============================================
+// projects/schema/src/lib/schema-links.component.ts
+// ============================================
+// Componente responsable de renderizar enlaces (aristas) como <path> dentro de un <svg>.
+// - Recibe las aristas ya con sus puntos calculados por el layout service.
+// - Soporta estilos de trazo: "orthogonal" | "curve" | "line".
+// - Emite linkClick al interactuar con un enlace.
+// Este archivo añade documentación JSDoc sin cambiar la lógica.
+// ============================================
 
 import {
   ChangeDetectionStrategy,
@@ -36,7 +44,7 @@ import { SchemaEdge, SchemaOptions, DEFAULT_OPTIONS } from '../../models';
         top: 0;
         pointer-events: auto;
         overflow: visible;
-        z-index: 0;
+        z-index: 0; /* los links quedan por debajo de las cards */
       }
       path {
         cursor: pointer;
@@ -46,16 +54,55 @@ import { SchemaEdge, SchemaOptions, DEFAULT_OPTIONS } from '../../models';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SchemaLinksComponent {
+  // ===========================
+  // Inputs
+  // ===========================
+
+  /**
+   * Lista de aristas a dibujar. Cada arista debe traer `points`
+   * (inicio, opcionales bends y fin) calculados por el servicio de layout.
+   */
   edges = input.required<SchemaEdge[]>();
+
+  /** Color del trazo (stroke) de los enlaces. */
   linkStroke = input<string>(DEFAULT_OPTIONS.linkStroke!);
+
+  /** Grosor del trazo (stroke-width) de los enlaces. */
   linkStrokeWidth = input<number>(DEFAULT_OPTIONS.linkStrokeWidth!);
+
+  /**
+   * Opciones de render. Se leen aquí:
+   * - linkStyle: 'orthogonal' | 'curve' | 'line'
+   * - curveTension: número (20–200 recomendado) → apertura de curva cuando linkStyle='curve'
+   * - straightThresholdDx: número (p.ej. 60–240) → si dx < threshold y linkStyle='curve', se dibuja recta
+   */
   options = input<SchemaOptions>(DEFAULT_OPTIONS);
 
+  /** Ancho del lienzo SVG (virtual). */
   @Input() width = 4000;
+
+  /** Alto del lienzo SVG (virtual). */
   @Input() height = 2000;
 
+  // ===========================
+  // Outputs
+  // ===========================
+
+  /** Click sobre un enlace; se emite la arista asociada. */
   @Output() linkClick = new EventEmitter<SchemaEdge>();
 
+  // ===========================
+  // Trazado de caminos SVG
+  // ===========================
+
+  /**
+   * Construye el atributo `d` del <path> en función de:
+   * - linkStyle:
+   *    • 'orthogonal': polilínea Manhattan con puntos dados (ya saneados).
+   *    • 'curve': curva cúbica; si dx < straightThresholdDx → recta.
+   *    • 'line': línea recta simple.
+   * - points: lista de {x,y} con al menos [start, end].
+   */
   pathFor(e: SchemaEdge): string {
     const pts = e.points ?? [];
     const {
@@ -70,21 +117,30 @@ export class SchemaLinksComponent {
       const a = pts[0],
         b = pts[pts.length - 1];
       const dxAbs = Math.abs(b.x - a.x);
+
+      // Si la separación horizontal es corta, trazamos recta limpio centro↔centro.
       if (dxAbs < straightThresholdDx) {
         return `M ${a.x},${a.y} L ${b.x},${b.y}`;
       }
+
+      // Curva cúbica suave: la tensión controla cuánto se abre en X.
       const t = Math.max(20, Math.min(200, curveTension));
       const dir = Math.sign(b.x - a.x) || 1;
       const dy = b.y - a.y;
+
+      // Puntos de control: desplazamiento lateral (c1x/c2x) y ajuste mínimo vertical si dy≈0.
       let c1x = a.x + dir * t,
         c1y = a.y;
       let c2x = b.x - dir * t,
         c2y = b.y;
+
+      // Si están casi a la misma altura, damos una “panza” sutil para percibir curva.
       if (Math.abs(dy) < 1) {
         const bow = Math.max(8, Math.min(96, t * 0.5));
         c1y = a.y - bow;
         c2y = b.y + bow;
       }
+
       return `M ${a.x},${a.y} C ${c1x},${c1y} ${c2x},${c2y} ${b.x},${b.y}`;
     }
 
@@ -103,6 +159,11 @@ export class SchemaLinksComponent {
       .join(' ')}`;
   }
 
+  /**
+   * Maneja el click sobre un path:
+   * - Detiene la propagación para no interferir con pan/zoom del contenedor.
+   * - Emite `linkClick` con la arista correspondiente.
+   */
   onLinkClick(e: SchemaEdge, ev: MouseEvent) {
     ev.stopPropagation();
     this.linkClick.emit(e);

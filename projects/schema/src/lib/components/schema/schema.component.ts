@@ -1,4 +1,10 @@
-// path: projects/schema/src/lib/schema.component.ts
+// ============================================
+// projects/schema/src/lib/schema.component.ts
+// ============================================
+// Visor del esquema: orquesta normalización → layout → render de cards y links,
+// y provee interacción (pan/zoom/fit). Este archivo incluye documentación JSDoc
+// de entradas, salidas y métodos públicos/privados. No modifica la lógica.
+// ============================================
 
 import {
   AfterViewInit,
@@ -88,36 +94,85 @@ import { SchemaLinksComponent } from '../schema-links/schema-links.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SchemaComponent implements AfterViewInit, OnChanges {
-  // inputs
+  // ===========================
+  // Inputs
+  // ===========================
+
+  /** JSON (o sub-árbol) a graficar. */
   data = input<any>();
+
+  /** Opciones de configuración del grafo/render. */
   options = input<SchemaOptions>(DEFAULT_OPTIONS);
+
+  /** Color del trazo de los enlaces (SVG stroke). */
   linkStroke = input<string>(DEFAULT_OPTIONS.linkStroke!);
+
+  /** Grosor del trazo de los enlaces (SVG stroke-width). */
   linkStrokeWidth = input<number>(DEFAULT_OPTIONS.linkStrokeWidth!);
+
+  /**
+   * Template opcional para personalizar el contenido de cada card.
+   * Si es `null`, se usa el template por defecto de la librería.
+   */
   cardTemplate = input<TemplateRef<any> | null>(null);
 
-  // outputs
+  // ===========================
+  // Outputs
+  // ===========================
+
+  /** Evento de click sobre un nodo (card). */
   @Output() nodeClick = new EventEmitter<SchemaNode>();
+
+  /** Evento de click sobre un enlace (path). */
   @Output() linkClick = new EventEmitter<SchemaEdge>();
 
+  // ===========================
+  // Estado interno (signals)
+  // ===========================
+
+  /** Grafo normalizado y con layout aplicado. */
   private graph = signal<NormalizedGraph>({ nodes: [], edges: [] });
+
+  /** Lista reactiva de nodos (derivada). */
   nodes = computed(() => this.graph().nodes);
+
+  /** Lista reactiva de aristas (derivada). */
   edges = computed(() => this.graph().edges);
 
+  /** Referencia al contenedor raíz para medir viewport y escuchar interacción. */
   @ViewChild('root', { static: true }) rootRef!: ElementRef<HTMLElement>;
 
+  /** Escala de zoom actual. */
   private scale = signal(1);
-  private minScale = signal(0.2); // 👈 se recalcula tras layout
+
+  /**
+   * Escala mínima permitida. Se recalcula tras layout/medición para que el grafo
+   * completo entre en el viewport (fitToView).
+   */
+  private minScale = signal(0.2);
+
+  /** Escala máxima permitida para zoom-in. */
   private maxScale = signal(3);
+
+  /** Traslación X (pan) en píxeles. */
   private tx = signal(0);
+
+  /** Traslación Y (pan) en píxeles. */
   private ty = signal(0);
+
+  /** Transform CSS aplicado a la “stage”: translate(tx,ty) scale(s). */
   transform = computed(
     () => `translate(${this.tx()}px, ${this.ty()}px) scale(${this.scale()})`
   );
 
+  /** Dimensiones del lienzo virtual donde se dibuja el SVG y las cards. */
   virtualWidth = 4000;
   virtualHeight = 2000;
 
+  /** Estado de drag para pan. */
   private dragging = false;
+
+  /** Última posición del puntero (para calcular deltas de pan). */
   private lastX = 0;
   private lastY = 0;
 
@@ -126,18 +181,37 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     private layoutService: SchemaLayoutService
   ) {}
 
+  // ===========================
+  // Ciclo de vida
+  // ===========================
+
+  /** Inicializa el cómputo del grafo tras montar la vista. */
   ngAfterViewInit(): void {
     this.compute();
   }
+
+  /** Recalcula el grafo cuando cambian inputs (data/options/etc.). */
   ngOnChanges(_: SimpleChanges): void {
     this.compute();
   }
 
+  // ===========================
+  // Pipeline principal
+  // ===========================
+
+  /**
+   * Normaliza los datos, ejecuta el layout, actualiza el grafo y ajusta la vista.
+   * 1) `JsonAdapterService.normalize` → grafo base
+   * 2) `SchemaLayoutService.layout` → posiciones (x,y,w,h) y puntos de aristas
+   * 3) Medición real de cards en DOM → si cambian tamaños, relayout
+   * 4) `fitToView()` para encajar todo en el viewport
+   */
   private async compute(): Promise<void> {
     const normalized = this.adapter.normalize(this.data(), this.options());
     let laid = await this.layoutService.layout(normalized, this.options());
     this.graph.set(laid);
-    console.log('nodes:', laid.nodes.length, 'edges:', laid.edges.length);
+
+    // Medición de cards y realayout si hay cambios de tamaño
     await queueMicrotask(async () => {
       const root = this.rootRef.nativeElement;
       const cards = Array.from(
@@ -145,14 +219,11 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
       );
       let changed = false;
 
-      // mapa por id
+      // mapa por id (referencia útil si se enlaza __nodeId en el futuro)
       const nodeMap = new Map(this.graph().nodes.map((n) => [n.id, n]));
 
       for (const el of cards) {
-        const id = el.querySelector('.card-title')
-          ? (el.closest('.schema-card') as any)?.__nodeId
-          : null;
-        // como no tenemos __nodeId, usamos posición para encontrar el nodo más cercano
+        // Nota: hoy no se setea __nodeId en el DOM; se usa la coincidencia por posición.
         const rect = el.getBoundingClientRect();
         const match = this.graph().nodes.find(
           (n) =>
@@ -178,17 +249,23 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
         this.graph.set(laid);
       }
 
-      // Ajustar min zoom para encajar todo
+      // Ajustar zoom mínimo y centrar con padding
       this.fitToView();
     });
   }
 
+  // ===========================
+  // Cálculos de viewport / encuadre
+  // ===========================
+
+  /** Devuelve el tamaño visible (px) del contenedor raíz. */
   private getViewportSize() {
     const el = this.rootRef.nativeElement;
     const rect = el.getBoundingClientRect();
     return { w: rect.width, h: rect.height };
   }
 
+  /** Calcula el bounding-box del grafo considerando posición y tamaño de cada nodo. */
   private getGraphBounds() {
     const ns = this.nodes();
     if (!ns.length) return { minX: 0, minY: 0, maxX: 1, maxY: 1 };
@@ -205,18 +282,26 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     return { minX, minY, maxX, maxY };
   }
 
+  /**
+   * Ajusta `minScale` y centra el grafo en el viewport con un padding fijo.
+   * No fuerza zoom > 1; respeta el zoom actual si ya es mayor al mínimo requerido.
+   */
   private fitToView() {
     const { w, h } = this.getViewportSize();
     const { minX, minY, maxX, maxY } = this.getGraphBounds();
     const gw = Math.max(1, maxX - minX);
     const gh = Math.max(1, maxY - minY);
     const pad = 24;
+
+    // escala mínima necesaria para encajar el grafo
     const sx = (w - pad) / gw;
     const sy = (h - pad) / gh;
     const s = Math.max(0.05, Math.min(sx, sy));
-    this.minScale.set(Math.min(s, 1)); // no forzamos a >1
+
+    this.minScale.set(Math.min(s, 1)); // no forzar a > 1
     this.scale.set(Math.max(this.scale(), this.minScale())); // mantener zoom >= min
-    // centra el primer nodo a la izquierda con padding
+
+    // centrar “primer nodo” con padding (anclaje a la izquierda)
     const first = this.nodes()[0];
     if (first) {
       const targetX = pad - (first.x ?? 0) * this.scale();
@@ -226,12 +311,19 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     }
   }
 
-  // ==== Interacción ====
+  // ===========================
+  // Interacción (zoom/pan/centrado)
+  // ===========================
+
+  /**
+   * Zoom con rueda del mouse, centrado en el cursor del usuario.
+   * @param e WheelEvent
+   */
   onWheel(e: WheelEvent) {
     e.preventDefault();
     const root = this.rootRef.nativeElement;
     const rect = root.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left; // coords en viewport del root
+    const mouseX = e.clientX - rect.left; // coords relativas al root
     const mouseY = e.clientY - rect.top;
 
     const oldScale = this.scale();
@@ -242,7 +334,7 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
       Math.min(this.maxScale(), oldScale * factor)
     );
 
-    // 👇 zoom centrado en el cursor
+    // Convertir punto pantalla → mundo, y mantenerlo estable tras el zoom
     const worldX = (mouseX - this.tx()) / oldScale;
     const worldY = (mouseY - this.ty()) / oldScale;
     this.tx.set(mouseX - worldX * newScale);
@@ -250,11 +342,20 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     this.scale.set(newScale);
   }
 
+  /**
+   * Inicia el drag para pan.
+   * @param e MouseEvent
+   */
   onPointerDown(e: MouseEvent) {
     this.dragging = true;
     this.lastX = e.clientX;
     this.lastY = e.clientY;
   }
+
+  /**
+   * Actualiza la traslación (pan) durante el drag.
+   * @param e MouseEvent
+   */
   onPointerMove(e: MouseEvent) {
     if (!this.dragging) return;
     const dx = e.clientX - this.lastX;
@@ -264,16 +365,20 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     this.lastX = e.clientX;
     this.lastY = e.clientY;
   }
+
+  /** Finaliza el drag para pan. */
   onPointerUp() {
     this.dragging = false;
   }
 
-  // 👇 Doble click: centrar al primer elemento
+  /**
+   * Doble click: reposiciona la vista para alinear el primer nodo con padding.
+   * Mantiene el zoom actual.
+   */
   onDblClick() {
     const first = this.nodes()[0];
     if (!first) return;
     const pad = 24;
-    // mantenemos el scale actual; solo reposicionamos
     const s = this.scale();
     const targetX = pad - (first.x ?? 0) * s;
     const targetY = pad - (first.y ?? 0) * s;

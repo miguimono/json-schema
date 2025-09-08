@@ -1,4 +1,17 @@
-// path: projects/schema/src/lib/schema-layout.service.ts
+// ============================================
+// projects/schema/src/lib/schema-layout.service.ts
+// ============================================
+// Calcula posiciones de nodos y ruta de aristas usando ELK (layered) y adapta
+// los puntos para el render (incluye flip de coordenadas Y y anclaje en bordes).
+// Reglas clave:
+//  - Dirección principal controlada por `options.layoutDirection` (default "RIGHT").
+//  - Enlaces con routing ORTHOGONAL desde ELK.
+//  - Flip Y consistente usando el rango de Y de nodos y aristas.
+//  - Anclar enlaces en borde derecho (source) → borde izquierdo (target).
+//  - Si `linkStyle === "orthogonal"`, se reconstruye una polilínea Manhattan
+//    limpia de 4 puntos: (sx,sy) → (midX,sy) → (midX,ey) → (ex,ey).
+// No modifica la lógica de layout, añade documentación JSDoc y comentarios.
+// ============================================
 
 import { Injectable } from '@angular/core';
 import ELK from 'elkjs/lib/elk.bundled.js';
@@ -6,8 +19,27 @@ import { NormalizedGraph, SchemaOptions, DEFAULT_OPTIONS } from '../models';
 
 @Injectable({ providedIn: 'root' })
 export class SchemaLayoutService {
+  /** Instancia de ELK para cálculo de layout. */
   private elk = new ELK();
 
+  /**
+   * Ejecuta el layout sobre el grafo normalizado y devuelve un nuevo grafo con
+   * coordenadas (x,y), tamaño (w,h) y puntos de aristas listos para render.
+   *
+   * Pipeline:
+   *  1) Construcción del grafo ELK con opciones (layered, direction, spacing, etc.).
+   *  2) Llamada a `elk.layout`.
+   *  3) Flip de coordenadas Y usando min/max globales (nodos + aristas).
+   *  4) Mapeo de nodos y aristas al modelo interno:
+   *     - Nodos: x,y,width,height.
+   *     - Aristas: start/bends/end con flip aplicado.
+   *     - Anclaje en bordes (source:right-center, target:left-center).
+   *     - Para linkStyle 'orthogonal': reconstrucción Manhattan de 4 puntos.
+   *
+   * @param graph Grafo normalizado (sin posiciones).
+   * @param opts  Subconjunto de SchemaOptions que sobrescribe DEFAULT_OPTIONS.
+   * @returns     Grafo con posiciones y puntos calculados.
+   */
   async layout(
     graph: NormalizedGraph,
     opts: Partial<SchemaOptions> = {}
@@ -15,6 +47,7 @@ export class SchemaLayoutService {
     const options: SchemaOptions = { ...DEFAULT_OPTIONS, ...opts };
     const dir = options.layoutDirection ?? 'RIGHT';
 
+    // ---- 1) Grafo de ELK y opciones de layout
     const elkGraph: any = {
       id: 'root',
       layoutOptions: {
@@ -41,9 +74,10 @@ export class SchemaLayoutService {
       })),
     };
 
+    // ---- 2) Ejecutar ELK
     const res = await this.elk.layout(elkGraph);
 
-    // ---- Flip Y con TODOS los Y (nodos + aristas)
+    // ---- 3) Flip Y usando TODOS los Y (nodos + aristas) para mantener coherencia global
     const childYs: number[] = (res['children'] || []).map((c: any) => c.y ?? 0);
     const edgeYs: number[] = [];
     for (const ee of res['edges'] || []) {
@@ -58,7 +92,7 @@ export class SchemaLayoutService {
     const maxY = allYs.length ? Math.max(...allYs) : 0;
     const flipY = (y: number) => maxY - y + minY;
 
-    // ---- Mapear nodos
+    // ---- 4) Mapear nodos: asignar posiciones y tamaños
     const mapNodes = new Map(graph.nodes.map((n) => [n.id, n]));
     res['children']?.forEach((c: any) => {
       const node = mapNodes.get(c.id);
@@ -69,13 +103,13 @@ export class SchemaLayoutService {
       node.height = c.height ?? node.height;
     });
 
-    // ---- Mapear aristas
+    // ---- 5) Mapear aristas: puntos con flip, anclaje y saneo según estilo
     const mapEdges = new Map(graph.edges.map((e) => [e.id, e]));
     res['edges']?.forEach((ee: any) => {
       const e = mapEdges.get(ee.id);
       if (!e || !ee.sections?.length) return;
 
-      // 1) pts = start + bends + end (ya con flip)
+      // 5.1) Recolectar puntos (start + bends + end) con flip aplicado
       let pts: Array<{ x: number; y: number }> = [];
       ee.sections.forEach((s: any) => {
         if (s.startPoint)
@@ -90,21 +124,21 @@ export class SchemaLayoutService {
         return;
       }
 
-      // 2) Ajustar extremos al BORDE (RIGHT→LEFT)
+      // 5.2) Anclar extremos al BORDE (RIGHT→LEFT) de las cards
       const src = mapNodes.get(e.source);
       const tgt = mapNodes.get(e.target);
       if (src) {
-        const xStart = (src.x ?? 0) + (src.width ?? 0); // borde derecho
+        const xStart = (src.x ?? 0) + (src.width ?? 0); // borde derecho (centerY)
         const yStart = (src.y ?? 0) + (src.height ?? 0) / 2;
         pts[0] = { x: xStart, y: yStart };
       }
       if (tgt) {
-        const xEnd = tgt.x ?? 0; // borde izquierdo
+        const xEnd = tgt.x ?? 0; // borde izquierdo (centerY)
         const yEnd = (tgt.y ?? 0) + (tgt.height ?? 0) / 2;
         pts[pts.length - 1] = { x: xEnd, y: yEnd };
       }
 
-      // 3) Si es orthogonal, garantizar segmentos 90° en los extremos
+      // 5.3) Si es orthogonal, reconstruir polilínea Manhattan limpia (H→V→H)
       if (
         (options.linkStyle ?? 'orthogonal') === 'orthogonal' &&
         pts.length >= 2
@@ -116,20 +150,21 @@ export class SchemaLayoutService {
         const ex = end.x,
           ey = end.y;
 
-        // eje intermedio centrado: evita puntas y diagonales
+        // Eje vertical intermedio centrado que evita puntas y diagonales
         const midX = Math.round((sx + ex) / 2);
 
         pts = [
-          { x: sx, y: sy }, // sale horizontal desde el source
-          { x: midX, y: sy }, // codo 1 (horizontal -> vertical)
+          { x: sx, y: sy }, // tramo inicial horizontal desde el source
+          { x: midX, y: sy }, // codo 1 (H→V)
           { x: midX, y: ey }, // tramo vertical
-          { x: ex, y: ey }, // tramo final horizontal hacia el target
+          { x: ex, y: ey }, // tramo final horizontal al target
         ];
       }
 
       e.points = pts;
     });
 
+    // ---- Resultado final con posiciones y rutas listas para pintar
     return { nodes: graph.nodes, edges: graph.edges, meta: graph.meta };
   }
 }
