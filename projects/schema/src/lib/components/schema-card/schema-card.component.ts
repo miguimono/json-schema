@@ -33,13 +33,6 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
       </ng-container>
 
       <ng-template #defaultTpl>
-        <div
-          class="card-badge"
-          *ngIf="(node()?.jsonMeta?.childrenCount ?? 0) > 0"
-        >
-          {{ node()?.jsonMeta?.childrenCount }} hijos
-        </div>
-
         <div class="card-body">
           <div class="card-title" *ngIf="showTitle()">
             {{ node()?.jsonMeta?.title || node()?.label }}
