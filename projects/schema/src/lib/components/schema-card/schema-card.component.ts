@@ -46,7 +46,7 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
         <!-- (El badge redundante "N hijos" fue eliminado) -->
         <div class="card-body">
           <div class="card-title" *ngIf="showTitle()">
-            {{ node()?.jsonMeta?.title || node()?.label }} // XXX
+            {{ node()?.jsonMeta?.title || node()?.label }}
           </div>
           <div
             class="card-preview"
@@ -121,19 +121,19 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
         border-radius: 10px;
       }
       .schema-card.accent-true {
-        border-color: #1b5e20;
+        border-color: #5dbe3f;
         box-shadow: 0 2px 10px rgba(27, 94, 32, 0.15);
       }
       .schema-card.accent-false {
-        border-color: #b71c1c;
+        border-color: #d41818;
         box-shadow: 0 2px 10px rgba(183, 28, 28, 0.15);
       }
       .v-true {
-        color: #1b5e20;
+        color: #5dbe3f;
         font-weight: 600;
       }
       .v-false {
-        color: #b71c1c;
+        color: #d41818;
         font-weight: 600;
       }
       array-badges {

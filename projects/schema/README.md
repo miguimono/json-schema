@@ -1,33 +1,26 @@
-# Schema - Librería Angular para Visualización de JSON
+# Schema 0.3.5 — Librería Angular para Visualización de JSON
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Angular](https://img.shields.io/badge/Angular-19-red.svg)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)
 
-**Schema** es una librería para Angular 19 que transforma cualquier dato JSON en esquemas visuales interactivos y navegables. Construida con componentes standalone y patrones modernos de Angular, permite convertir cualquier JSON en un grafo con nodos y conexiones, con layouts personalizables, navegación fluida y soporte básico para datasets grandes.
+**Schema** es una librería para **Angular 19** que transforma **cualquier JSON** en un **grafo navegable** (cards + enlaces) con **layouts automáticos** vía ELK, **pan/zoom** fluido y **templates personalizables**. Es **genérica**: no asume dominios como “central/cable/cto/user”; su modelado funciona con _todo_ JSON.
+
+> URL del proyecto: **https://github.com/miguimono/schema**  
+> (ajusta la URL si tu repositorio es distinto)
 
 ---
 
-## ✨ Características Principales
+## ✨ Características
 
-- **Soporte JSON Universal**: Funciona con cualquier estructura JSON.
-- **Múltiples Estrategias de Layout**: Layouts tipo árbol y por niveles (otros planificados).
-- **Navegación Interactiva**: Pan, zoom y doble clic para “fit to content”.
-- **Render de Cards Personalizables**: Con `ng-template` se puede redefinir cómo mostrar nodos.
-- **Opciones para Arrays y Strings**: Previews recortados, políticas para arrays grandes.
-- **Optimizado para JSON masivos**: Con poda de nodos vacíos y truncado de strings.
-- **TypeScript First**: Tipado completo con IntelliSense.
-
----
-
-## Contexto del proyecto
-
-- Proyecto: **Schema**
-- Tipo: Librería **Angular 19** (standalone components)
-- Lenguaje: **TypeScript**
-- Dependencias clave: **elkjs** (layouts), **d3-zoom** (interacciones), **rxjs**
-- Objetivo: Visualizar cualquier JSON como un **grafo navegable** con nodos (cards) y aristas (links), con pan/zoom, layouts configurables y soporte para datos grandes.
+- **JSON-agnóstica**: grafica cualquier estructura y tamaño de JSON.
+- **Layout automático (ELK)**: orientación **RIGHT** (izq→der) o **DOWN** (arriba→abajo), con ruteo ortogonal limpio.
+- **Interacción moderna**: pan, zoom con foco en cursor, doble click para recentrar.
+- **Cards personalizables**: usa tu propio `ng-template` por nodo.
+- **Control de enlaces**: estilos `orthogonal`, `curve`, `line`; **curvas adaptativas** con `curveTension` y `straightThresholdDx`.
+- **Previews útiles**: selección de atributos, ocultar claves, arrays de escalares como texto, badges de conteos para arrays de objetos.
+- **Standalone & Signals**: componentes standalone, API reactiva y tipada.
 
 ---
 
@@ -39,211 +32,208 @@ npm install @miguimono/schema
 
 ---
 
-## 🚀 Inicio Rápido
+## 🚀 Uso Rápido
 
-### Uso Básico
+### 1) Importa y usa el componente
 
-```typescript
-import { SchemaComponent } from "@miguimono/schema";
+```ts
+import { Component } from "@angular/core";
+import { CommonModule } from "@angular/common";
+import { SchemaComponent, SchemaOptions } from "@miguimono/schema";
 
 @Component({
   selector: "app-demo",
   standalone: true,
-  imports: [SchemaComponent],
-  template: `<schema [data]="datosJson"></schema>`,
+  imports: [CommonModule, SchemaComponent],
+  template: ` <schema [data]="data" [options]="options" (nodeClick)="onNode($event)" (linkClick)="onLink($event)"> </schema> `,
 })
 export class DemoComponent {
-  jsonTitleKeys = ["title", "name", "id"]; // Elementos que seran titulos
-  labelData = {
-    title: "Titulo",
-    name: "Nombre",
-    id: "Identificador",
-  }; // Datos a traducir
+  data = {
+    /* tu JSON arbitrario */
+  };
 
   options: SchemaOptions = {
-    layout: "tree", // "tree" (jerárquico) | "level" (por profundidad) | "force"(futuro) | "circular"(futuro)
-    align: "firstChild", // cómo colocar el padre respecto a los hijos: "firstChild" | "center" | "left"
-    gapX: 380, // separación horizontal entre columnas (px)
-    gapY: 180, // separación vertical entre nodos (px)
-    padding: 24, // margen interno del lienzo (px)
-    linkStyle: "orthogonal", // estilo de aristas: "line" | "curve" | "orthogonal" | "step"
+    // extracción/preview
+    titleKeyPriority: ["name", "title", "id"],
+    hiddenKeysGlobal: [],
+    previewMaxKeys: 6,
+    treatScalarArraysAsAttribute: true,
+    collapseArrayContainers: true,
+    collapseSingleChildWrappers: true,
+    maxDepth: null,
+    titleMode: "auto",
 
-    // ===== Procesamiento del JSON =====
-    jsonMaxDepth: 10, // profundidad máxima a recorrer (corta/“trunca” más allá de este nivel)
-    jsonMaxChildren: 50, // máximo de hijos que se procesan por nodo
-    jsonStringMaxLen: 120, // longitud máxima para previews de strings (evita cards gigantes)
-    jsonAttrMax: 10, // límite de atributos primitivos a mostrar por card (renderer por defecto)
-    jsonArrayPolicy: "fanout", // "count" | "fanout" | "paged"(futuro) | "sample"
-    jsonArraySampleSize: 2, // cuántos elementos “abre” o samplea inicialmente
-    jsonTitleKeys: ["name", "title", "label", "id"], // claves que se priorizan como título de cada card
-    jsonIgnoreKeys: ["_meta", "_internal"], // claves a ignorar completamente
+    // layout / enlaces
+    layoutDirection: "RIGHT",
+    layoutAlign: "center",
+    linkStyle: "orthogonal", // "orthogonal" | "curve" | "line"
+    linkStroke: "#019df4",
+    linkStrokeWidth: 2,
 
-    // ===== Visibilidad / poda =====
-    hideRootArrayCard: true, // oculta la card de un array raíz []
-    hideRootObjectCard: false, // (por lo general se deja false; sólo oculta si realmente es “vacío”)
-    hideEmptyNodes: true, // poda nodos sin contenido (defensa contra ruido)
+    // curvas (si usas linkStyle="curve")
+    curveTension: 80, // 20–200 recomendado
+    straightThresholdDx: 160, // si dx < 160 → recta aunque sea "curve"
 
-    // ===== Interacciones (Pan & Zoom) =====
-    panZoomEnabled: true, // habilita arrastrar y hacer zoom con la rueda
-    zoomMin: 0.25, // zoom mínimo
-    zoomMax: 3, // zoom máximo
-    zoomStep: 0.12, // paso incremental de zoom (rueda del mouse)
-    initialZoom: "fit", // número (ej. 1) o "fit" para ajustar al contenido
-    fitPadding: 24, // margen alrededor del contenido al hacer “fit”
-
-    // ===== Theming (opcional) =====
-    theme: "auto", // "light" | "dark" | "auto"
-    colorScheme: "default", // "default" | "rainbow" | "monochrome" | "custom"
-    customColors: {
-      // aplica si colorScheme === "custom"
-      object: "#6b7280",
-      array: "#2563eb",
-      primitive: "#16a34a",
-      root: "#111827",
-    },
-
-    // ===== Rendimiento (futuro/optativo) =====
-    virtualization: false, // si true, renderiza sólo lo visible en viewport
-    lazyLoading: false, // carga perezosa de subárboles
-    collapseThreshold: 9999, // auto-colapsa nodos con más de N hijos (si aplicas colapsado)
+    // acento opcional por booleano
+    accentByKey: null,
   };
+
+  onNode(n: unknown) {
+    console.log("node", n);
+  }
+  onLink(e: unknown) {
+    console.log("edge", e);
+  }
 }
 ```
 
-### Configuración Avanzada
+### 2) Template de card personalizado (opcional)
 
 ```html
-<schema [data]="schemeData" [options]="options" [linkStroke]="stroke!" [linkStrokeWidth]="strokeWidth!" (nodeClick)="onNode($event)" (linkClick)="onLink($event)" [cardTemplate]="jsonTitleKeys()?.length ? cardTplCustomEs : null"></schema>
-<section>
-  <ng-template #cardTplCustomEs let-node>
-    <div style="padding: 8px; max-width: 220px">
-      <div style="font-weight: 600; font-size: 13px; margin-bottom: 4px">
-        <span>{{ node.jsonMeta?.title || node.data?.name }}</span>
-      </div>
+<schema [data]="data" [options]="options" [cardTemplate]="cardTpl"> </schema>
 
-      <ng-container *ngIf="node.jsonMeta?.attributes as attrs">
-        <div style="font-size: 11px; line-height: 1.3">
-          <ng-container *ngFor="let kv of attrs | keyvalue | slice: 0 : 10">
-            <div>
-              <span style="opacity: 0.7; margin-right: 4px">{{ labelEs(kv.key) }}:</span>
-              <span>{{ kv.value }}</span>
-            </div>
-          </ng-container>
-          <div *ngIf="(attrs | keyvalue).length > 10" style="font-size: 10px; opacity: 0.6; margin-top: 4px">+{{ (attrs | keyvalue).length - 10 }} más</div>
+<ng-template #cardTpl let-node>
+  <div style="padding:8px; max-width: 240px">
+    <div style="font-weight:600; font-size:12px; margin-bottom:4px">{{ node.jsonMeta?.title || node.label }}</div>
+
+    <ng-container *ngIf="node.jsonMeta?.attributes as attrs">
+      <div style="font-size: 11px; line-height: 1.3">
+        <div *ngFor="let kv of (attrs | keyvalue)">
+          <span style="opacity:.7; margin-right:6px">{{ kv.key }}:</span>
+          <span>{{ kv.value }}</span>
         </div>
-      </ng-container>
-
-      <div *ngIf="node.jsonMeta?.preview" style="font-size: 11px; opacity: 0.75; margin-top: 6px">{{ node.jsonMeta?.preview }}</div>
-    </div>
-  </ng-template>
-</section>
-```
-
-```ts
-
+      </div>
+    </ng-container>
+  </div>
+</ng-template>
 ```
 
 ---
 
-## 🏗 Arquitectura General
+## 🧩 API de Componentes
+
+### `<schema>` (contenedor principal)
+
+Entradas:
+
+- `data: any` — JSON a graficar.
+- `options: SchemaOptions` — configuración (ver tabla).
+- `linkStroke?: string` — color de enlaces (por defecto del options).
+- `linkStrokeWidth?: number` — grosor de enlaces (por defecto del options).
+- `cardTemplate?: TemplateRef<any> | null` — template por nodo (si null, usa default).
+
+Salidas:
+
+- `(nodeClick)` — emite `SchemaNode` clicado.
+- `(linkClick)` — emite `SchemaEdge` clicado.
+
+Comportamiento:
+
+- Calcula layout con ELK, mide cards en DOM y ajusta si cambian de tamaño.
+- Pan/zoom con rueda (centrado en cursor) y drag; doble click para recentrar con padding.
+
+### `<schema-card>`
+
+- Renderiza una card posicionada por `left/top/width/height` del nodo.
+- Usa `jsonMeta.title`, `jsonMeta.attributes` y `jsonMeta.arrayCounts` para el contenido por defecto.
+- Aplica clases `accent-true` / `accent-false` si `options.accentByKey` apunta a un booleano en `node.data`.
+
+### `<schema-links>`
+
+- Dibuja `<path>` por arista dentro de `<svg>`.
+- Estilos: `orthogonal` (default), `curve` (con `curveTension` y `straightThresholdDx`), `line`.
+
+---
+
+## ⚙️ `SchemaOptions`
+
+| Propiedad                      | Tipo                                | Default                         | Descripción                                                              |
+| ------------------------------ | ----------------------------------- | ------------------------------- | ------------------------------------------------------------------------ |
+| `titleKeyPriority`             | `string[]`                          | `["name","title","id","label"]` | Prioridad para elegir el título de la card.                              |
+| `hiddenKeysGlobal`             | `string[]`                          | `[]`                            | Claves a excluir del preview.                                            |
+| `collapseArrayContainers`      | `boolean`                           | `true`                          | No crea card para contenedor array; conecta padre→elementos.             |
+| `collapseSingleChildWrappers`  | `boolean`                           | `true`                          | Colapsa envoltorios sin escalares con un único hijo objeto.              |
+| `edgeLabelFromContainerKey`    | `boolean`                           | `false`                         | (Reservado) Etiquetar aristas con clave contenedora.                     |
+| `maxDepth`                     | `number \| null`                    | `null`                          | Límite de profundidad (null = sin límite).                               |
+| `nodeIdStrategy`               | `"jsonpath"`                        | `"jsonpath"`                    | Estrategia de id de nodo.                                                |
+| `previewMaxKeys`               | `number`                            | `4`                             | Máx. de claves en preview de la card.                                    |
+| `treatScalarArraysAsAttribute` | `boolean`                           | `true`                          | Arrays de escalares como texto (join) en el padre.                       |
+| `defaultNodeSize`              | `{width:number;height:number}`      | `{220,96}`                      | Tamaño base; puede ajustarse tras medir DOM.                             |
+| `linkStroke`                   | `string`                            | `"#019df4"`                     | Color de enlaces.                                                        |
+| `linkStrokeWidth`              | `number`                            | `2`                             | Grosor de enlaces.                                                       |
+| `layoutAlign`                  | `"firstChild" \| "center"`          | `"center"`                      | Alineación vertical por capas.                                           |
+| `linkStyle`                    | `"orthogonal" \| "curve" \| "line"` | `"orthogonal"`                  | Estilo de aristas.                                                       |
+| `curveTension`                 | `number`                            | `80`                            | **Curvas**: “tirón” lateral (recomendado **20–200**).                    |
+| `straightThresholdDx`          | `number`                            | `160`                           | **Curvas**: si `dx < umbral` → trazo **recto** (recomendado **60–240**). |
+| `accentByKey`                  | `string \| null`                    | `null`                          | Clave booleana en `node.data` para acentos visuales.                     |
+| `titleMode`                    | `"auto" \| "none"`                  | `"auto"`                        | Mostrar/ocultar título en card por defecto.                              |
+| `layoutDirection`              | `"RIGHT" \| "DOWN"`                 | `"RIGHT"`                       | Dirección principal del layout.                                          |
+
+---
+
+## 🏗 Arquitectura
 
 ```
 projects/schema/src/lib/
-├── models.ts → modelos base (`SchemaNode`, `SchemaEdge`, `SchemaGraph`,
-├── services/
-│   ├── json-adapter.service.ts → convierte JSON → grafo.
-│   └── schema-layout.service.ts → calcula posiciones de nodos (tree, level).
-├── components/
-│   ├── schema/  → contenedor principal, maneja pan/zoom, renderiza nodos y aristas.
-│   ├── schema-card/ → render genérico de cada nodo como card.
-│   └── schema-links/ → render de aristas SVG.
-└── public-api.ts
+├─ models.ts                # Tipos públicos y DEFAULT_OPTIONS
+├─ services/
+│  ├─ json-adapter.service.ts   # JSON → grafo (nodes/edges)
+│  └─ schema-layout.service.ts  # ELK: posiciones y puntos (con flip Y y anclaje)
+├─ schema.component.ts      # Orquestador (pan/zoom, render, medición DOM)
+├─ schema-card.component.ts # Card genérica por nodo
+└─ schema-links.component.ts# Enlaces SVG (orthogonal/curve/line)
 ```
 
-### Componentes
+**Notas clave de layout**
 
-- **SchemaComponent**: Orquestador principal (pan/zoom, render de nodos + links, fit to content).
-- **SchemaCardComponent**: Render genérico de cada nodo (atributos, badges de arrays, templates).
-- **SchemaLinksComponent**: Render de aristas SVG (line, curve, orthogonal, step).
-
-### Servicios
-
-- **JsonAdapterService**: Convierte JSON en grafo (`SchemaGraph`).
-- **SchemaLayoutService**: Calcula posiciones según layout (`tree`, `level`).
+- Se usa **ELK (layered)** con ruteo **ORTHOGONAL**.
+- Tras ELK se **normalizan Y** (flip global coherente).
+- Enlaces se **anclan**: source → borde **derecho** (centro Y), target → borde **izquierdo** (centro Y).
+- Para `orthogonal`, la polilínea se **reconstruye** a 4 puntos limpios: H→V→H (sin “puntas raras”).
 
 ---
 
-## 📋 Opciones de Configuración
+## 🧪 Ejemplo de integración (FrontGDM)
 
-| Propiedad             | Tipo                                          | Default                 | Descripción                     |
-| --------------------- | --------------------------------------------- | ----------------------- | ------------------------------- |
-| `layout`              | `'tree' \| 'level'`                           | `'tree'`                | Estrategia de layout.           |
-| `align`               | `'firstChild' \| 'center' \| 'left'`          | `'firstChild'`          | Alineación padre ↔ hijos.       |
-| `gapX`                | `number`                                      | `280`                   | Separación horizontal (px).     |
-| `gapY`                | `number`                                      | `140`                   | Separación vertical (px).       |
-| `padding`             | `number`                                      | `24`                    | Padding interno del lienzo.     |
-| `linkStyle`           | `'line' \| 'curve' \| 'orthogonal' \| 'step'` | `'orthogonal'`          | Estilo de aristas.              |
-| `jsonMaxDepth`        | `number`                                      | `10`                    | Profundidad máxima procesada.   |
-| `jsonMaxChildren`     | `number`                                      | `50`                    | Máx. hijos por nodo.            |
-| `jsonArrayPolicy`     | `'count' \| 'fanout' \| 'sample'`             | `'count'`               | Estrategia para arrays grandes. |
-| `jsonArraySampleSize` | `number`                                      | `3`                     | Elementos a mostrar en arrays.  |
-| `jsonStringMaxLen`    | `number`                                      | `100`                   | Recorte de strings largos.      |
-| `jsonTitleKeys`       | `string[]`                                    | `["name","title","id"]` | Claves preferidas para títulos. |
-| `jsonIgnoreKeys`      | `string[]`                                    | `[]`                    | Claves a excluir.               |
-| `panZoomEnabled`      | `boolean`                                     | `true`                  | Habilitar pan y zoom.           |
-| `zoomMin`             | `number`                                      | `0.25`                  | Zoom mínimo.                    |
-| `zoomMax`             | `number`                                      | `2`                     | Zoom máximo.                    |
-| `zoomStep`            | `number`                                      | `0.1`                   | Paso de zoom (rueda).           |
-| `initialZoom`         | `number \| 'fit'`                             | `'fit'`                 | Zoom inicial.                   |
-| `fitPadding`          | `number`                                      | `24`                    | Margen extra al hacer “fit”.    |
+```html
+<app-sh-schema [title]="'Esquema de daño: '" [id]="damageId!" [schemeData]="$schemeDamageIdData()?.data"> </app-sh-schema>
+```
+
+El wrapper **ShSchemaComponent** compone `SchemaOptions` (e.g. `linkStyle: "curve"`, `curveTension: 30`, `straightThresholdDx: 60`) y define un `cardTemplate` opcional.
 
 ---
 
-## 📊 Performance y JSON grandes
+## 🗂 Changelog (resumen)
 
-- Truncado de strings (`jsonStringMaxLen`).
-- Poda de nodos vacíos (`hideEmptyNodes`).
-- Límites de profundidad (`jsonMaxDepth`) e hijos (`jsonMaxChildren`).
-- Políticas de arrays (`jsonArrayPolicy`).
+### 0.3.5
 
----
-
-## 🗺 Backlog
-
-### Versión 0.1.0
-
-- ✅ Render de nodos y aristas.
-- ✅ Layouts `tree` y `level`.
-- ✅ Pan & Zoom + Fit automático.
-- ✅ Configuración vía `SchemaOptions`.
-- ✅ Templates personalizados con `ng-template`.
-- ✅ Poda de nodos vacíos y raíz innecesaria.
-
-### Versión 0.2.0 (Actual)
-
-- 🔄 Auto-alto dinámico (ResizeObserver).
-- 🔄 Colapsado/expansión progresiva.
-- 🔄 Toolbar de acciones (zoom, reset, expand/collapse all).
-- 🔄 Color rules dinámicas.
-- 🔄 Theming básico con variables CSS.
-
-### Futuro (0.3.x)
-
-- 📅 Virtualización de nodos.
-- 📅 Web Worker para JSON masivos.
-- 📅 Exportación (PNG, SVG, JSON).
-- 📅 Layouts avanzados (force, circular).
-
-### Temas a optimizar
-
-- Los arrays generan una card extra (ej. `Array[5]`) que muchas veces es innecesaria → necesitamos resolverlo en 0.2.0 con una estrategia más simple y parametrizable.
-- Falta colapsado/expansión progresiva de nodos.
-- No existe toolbar unificada para acciones básicas.
-- No existe coloración por reglas de datos.
-- No hay soporte real para theming CSS variables.
+- **Curvas adaptativas**: nuevo `straightThresholdDx` para forzar **recta** cuando la distancia horizontal es corta, evitando “S” artificiales.
+- **Orthogonal limpio**: reconstrucción H→V→H centrada, sin puntas ni diagonales.
+- **Flip Y consistente**: normalización global para nodos y aristas.
+- **Documentación interna**: comentarios JSDoc y aclaraciones de API.
+- **Minor**: eliminación del badge redundante “N hijos”; las pills `k: N items` permanecen.
 
 ---
 
-## 🙋‍♂️ Soporte
+## 🧠 Recomendaciones de ajuste
 
-Hecho con ❤️ por [miguimono](https://github.com/miguimono), [linkedin](https://www.linkedin.com/in/miguimono/), [correo](miguimono@gmail.com)
+- **Curvas**:
+  - `curveTension`: 40–120 para curvas suaves.
+  - `straightThresholdDx`: 60–120 para que cercanos se dibujen **rectos**.
+- **Orthogonal**:
+  - Úsalo cuando quieras claridad Manhattan (diagramas técnicos/árboles densos).
+- **Preview**:
+  - Ajusta `previewMaxKeys` y `hiddenKeysGlobal` para mantener cards compactas.
+
+---
+
+## 📄 Licencia
+
+MIT © miguimono
+
+---
+
+## 🙋 Soporte
+
+Hecho con ❤️ por **miguimono**  
+GitHub: **https://github.com/miguimono** • LinkedIn: **https://www.linkedin.com/in/miguimono/** • Email: **miguimono@gmail.com**
