@@ -1,5 +1,5 @@
 // ============================================
-// projects/schema/src/lib/models.ts — v0.3.8.2
+// projects/schema/src/lib/models.ts — v0.3.8.6
 // ============================================
 
 export type LayoutAlign = 'firstChild' | 'center';
@@ -71,11 +71,13 @@ export interface SchemaOptions {
   maxCardHeight?: number | null;
   noWrapKeys?: string[];
 
-  /** Alinear hijos inmediatos del primer nodo visible (root). */
+  // Alineaciones
   snapRootChildrenY?: boolean;
-
-  /** NUEVO: Alinear cada tramo de una cadena (1→1) para que quede horizontal. */
   snapChainSegmentsY?: boolean;
+
+  // Colchón extra al medir (se suma a scrollWidth/scrollHeight)
+  measureExtraWidthPx?: number;
+  measureExtraHeightPx?: number;
 
   // DEBUG
   debug?: {
@@ -97,8 +99,7 @@ export const DEFAULT_OPTIONS: SchemaOptions = {
   previewMaxKeys: 4,
   treatScalarArraysAsAttribute: true,
 
-  // un poco más ancha de base
-  defaultNodeSize: { width: 260, height: 96 },
+  defaultNodeSize: { width: 320, height: 96 },
 
   linkStroke: '#4CAF50',
   linkStrokeWidth: 1.25,
@@ -110,14 +111,17 @@ export const DEFAULT_OPTIONS: SchemaOptions = {
   layoutDirection: 'RIGHT',
   straightThresholdDx: 160,
 
-  // auto-resize y SIN tope de ancho para que pueda crecer
   autoResizeCards: true,
-  maxCardWidth: null, // <- deja que el contenido haga crecer la card
+  maxCardWidth: null,
   maxCardHeight: null,
-  noWrapKeys: ['cto_name', 'cai', 'port_name'],
+  noWrapKeys: [],
 
-  snapRootChildrenY: false, // lo dejamos off; usaremos snapChainSegmentsY
-  snapChainSegmentsY: true, // <- activa alineación por cadena 1→1
+  snapRootChildrenY: false,
+  snapChainSegmentsY: true,
+
+  // 👇 Colchón por defecto (“aire” adicional)
+  measureExtraWidthPx: 24,
+  measureExtraHeightPx: 0,
 
   debug: {
     measure: false,

@@ -1,6 +1,5 @@
 // ============================================
-// projects/schema/src/lib/schema.component.ts
-// v0.3.7-debug — logs detallados + forceMeasure() + clonación de nodos
+// projects/schema/src/lib/schema.component.ts — v0.3.8.6
 // ============================================
 
 import {
@@ -34,14 +33,7 @@ import { SchemaLinksComponent } from '../schema-links/schema-links.component';
 @Component({
   selector: 'schema',
   standalone: true,
-  imports: [
-    CommonModule,
-    NgFor,
-    NgIf,
-    NgTemplateOutlet,
-    SchemaCardComponent,
-    SchemaLinksComponent,
-  ],
+  imports: [CommonModule, NgFor, SchemaCardComponent, SchemaLinksComponent],
   template: `
     <div
       class="schema-root"
@@ -89,8 +81,8 @@ import { SchemaLinksComponent } from '../schema-links/schema-links.component';
         position: absolute;
         left: 0;
         top: 0;
-        width: 4000px;
-        height: 2000px;
+        width: 12000px; /* amplio para cards largas */
+        height: 6000px;
         transform-origin: 0 0;
       }
     `,
@@ -98,18 +90,25 @@ import { SchemaLinksComponent } from '../schema-links/schema-links.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SchemaComponent implements AfterViewInit, OnChanges {
+  // ===========================
   // Inputs
+  // ===========================
+
   data = input<any>();
   options = input<SchemaOptions>(DEFAULT_OPTIONS);
   linkStroke = input<string>(DEFAULT_OPTIONS.linkStroke!);
   linkStrokeWidth = input<number>(DEFAULT_OPTIONS.linkStrokeWidth!);
   cardTemplate = input<TemplateRef<any> | null>(null);
 
+  // ===========================
   // Outputs
+  // ===========================
   @Output() nodeClick = new EventEmitter<SchemaNode>();
   @Output() linkClick = new EventEmitter<SchemaEdge>();
 
-  // State
+  // ===========================
+  // Estado
+  // ===========================
   private graph = signal<NormalizedGraph>({ nodes: [], edges: [] });
   nodes = computed(() => this.graph().nodes);
   edges = computed(() => this.graph().edges);
@@ -125,30 +124,50 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     () => `translate(${this.tx()}px, ${this.ty()}px) scale(${this.scale()})`
   );
 
-  virtualWidth = 4000;
-  virtualHeight = 2000;
+  virtualWidth = 12000;
+  virtualHeight = 6000;
 
   private dragging = false;
   private lastX = 0;
   private lastY = 0;
 
+  constructor(
+    private adapter: JsonAdapterService,
+    private layoutService: SchemaLayoutService
+  ) {}
+
+  // ===========================
+  // Ciclo de vida
+  // ===========================
   ngAfterViewInit(): void {
     this.compute();
-    if (this.options().debug?.exposeOnWindow) {
-      (window as any).schemaDebug = this;
-      // útil para inspección manual en consola
-      console.info('schemaDebug expuesto en window.schemaDebug');
-    }
   }
   ngOnChanges(_: SimpleChanges): void {
     this.compute();
   }
 
-  // ===== Pipeline =====
+  // ===========================
+  // Helpers internos
+  // ===========================
+  private cloneGraph(g: NormalizedGraph): NormalizedGraph {
+    return {
+      nodes: g.nodes.map((n) => ({ ...n })),
+      edges: g.edges.map((e) => ({ ...e })),
+      meta: { ...(g.meta ?? {}) },
+    };
+  }
+  private nextFrame(): Promise<void> {
+    return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+  }
+
+  // ===========================
+  // Pipeline principal
+  // ===========================
   private async compute(): Promise<void> {
     const opts = this.options();
+    const dbg = !!opts.debug?.measure;
 
-    // 1) normalizar + layout inicial
+    // 1) normalizar + primer layout
     const normalized = this.adapter.normalize(this.data(), opts);
     let laid = await this.layoutService.layout(normalized, opts);
     this.graph.set(this.cloneGraph(laid));
@@ -158,152 +177,97 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
       return;
     }
 
-    // 2) medir → clonar nodos → relayout (hasta 2 pases)
-    await this.nextFrame();
-    const changed1 = this.measureAndCloneNodes({
-      pass: 1,
-      log: !!opts.debug?.measure,
-    });
-    if (changed1) {
-      if (opts.debug?.layout)
-        console.groupCollapsed('[layout] relayout pass #1');
-      laid = await this.layoutService.layout(this.graph(), opts);
-      this.graph.set(this.cloneGraph(laid));
-      if (opts.debug?.layout) console.groupEnd();
-
+    // 2) medir → relayout hasta estabilizar
+    const maxPasses = 6;
+    for (let pass = 1; pass <= maxPasses; pass++) {
       await this.nextFrame();
-      const changed2 = this.measureAndCloneNodes({
-        pass: 2,
-        log: !!opts.debug?.measure,
-      });
-      if (changed2) {
-        if (opts.debug?.layout)
-          console.groupCollapsed('[layout] relayout pass #2');
-        laid = await this.layoutService.layout(this.graph(), opts);
-        this.graph.set(this.cloneGraph(laid));
-        if (opts.debug?.layout) console.groupEnd();
+      const changed = this.measureAndApply(pass, dbg);
+      if (dbg) {
+        console.log(`[measure] pass #${pass} — changed:`, changed);
       }
+      if (!changed) break;
+
+      laid = await this.layoutService.layout(this.graph(), opts);
+      if (opts.debug?.layout) console.log(`[layout] relayout pass #${pass}`);
+      this.graph.set(this.cloneGraph(laid));
     }
 
+    // 3) ajuste de encuadre
     this.fitToView();
+
+    // debug opcional
+    if (opts.debug?.exposeOnWindow) {
+      (window as any).schemaDebug = {
+        get graph() {
+          return structuredClone(laid);
+        },
+        options: opts,
+      };
+      console.log('schemaDebug expuesto en window.schemaDebug');
+    }
   }
 
-  constructor(
-    private adapter: JsonAdapterService,
-    private layoutService: SchemaLayoutService
-  ) {}
+  /** Mide .schema-card y aplica cambio de width/height con colchón extra. */
+  private measureAndApply(pass: number, log = false): boolean {
+    const opts = this.options();
+    const extraW = opts.measureExtraWidthPx ?? 0;
+    const extraH = opts.measureExtraHeightPx ?? 0;
 
-  /** Mide .schema-card y sustituye nodes por NUEVAS referencias. */
-  private measureAndCloneNodes(opts: { pass: number; log: boolean }): boolean {
     const root = this.rootRef.nativeElement;
     const cards = Array.from(
       root.querySelectorAll<HTMLElement>('.schema-card')
     );
-    const nodeMap = new Map(this.graph().nodes.map((n) => [n.id, n]));
+
+    const map = new Map(this.graph().nodes.map((n) => [n.id, n]));
     let changed = false;
 
     const rows: any[] = [];
 
     for (const el of cards) {
-      const id = el.getAttribute('data-node-id') ?? '';
-      const n = nodeMap.get(id);
-      if (!n) continue;
+      const id = el.getAttribute('data-node-id') ?? undefined;
+      const node = (id ? map.get(id) : undefined) ?? null;
+      if (!node) continue;
 
-      const sw = Math.ceil(el.scrollWidth);
-      const sh = Math.ceil(el.scrollHeight);
-      const cw = Math.ceil(el.clientWidth);
-      const ch = Math.ceil(el.clientHeight);
-      const ow = Math.ceil(el.offsetWidth);
-      const oh = Math.ceil(el.offsetHeight);
+      // scrollWidth/scrollHeight ya incluyen padding y borde
+      const w = Math.ceil(el.scrollWidth + extraW);
+      const h = Math.ceil(el.scrollHeight + extraH);
 
-      // límites
-      let w = sw,
-        h = sh;
-      const maxW = this.options().maxCardWidth ?? null;
-      const maxH = this.options().maxCardHeight ?? null;
-      if (maxW && w > maxW) w = maxW;
-      if (maxH && h > maxH) h = maxH;
-      w = Math.max(140, w);
-      h = Math.max(56, h);
+      // respetar maxCardWidth/Height si están definidos
+      const maxW = this.options().maxCardWidth ?? Infinity;
+      const maxH = this.options().maxCardHeight ?? Infinity;
+      const cw = Math.min(w, maxW);
+      const ch = Math.min(h, maxH);
 
-      const beforeW = n.width ?? 0;
-      const beforeH = n.height ?? 0;
-      const changedThis = beforeW !== w || beforeH !== h;
-      if (changedThis) changed = true;
+      if ((node.width ?? 0) !== cw || (node.height ?? 0) !== ch) {
+        node.width = cw;
+        node.height = ch;
+        changed = true;
+      }
 
-      rows.push({
-        pass: opts.pass,
-        id,
-        nodeW_before: beforeW,
-        nodeH_before: beforeH,
-        scrollW: sw,
-        scrollH: sh,
-        clientW: cw,
-        clientH: ch,
-        offsetW: ow,
-        offsetH: oh,
-        nodeW_after: w,
-        nodeH_after: h,
-        changed: changedThis,
-      });
+      if (log) {
+        rows.push({
+          pass,
+          id: node.id,
+          scrollW: el.scrollWidth,
+          scrollH: el.scrollHeight,
+          extraW,
+          extraH,
+          setW: cw,
+          setH: ch,
+        });
+      }
     }
 
-    if (opts.log && rows.length) {
-      console.groupCollapsed(
-        `[measure] pass #${opts.pass} — ${
-          rows.filter((r) => r.changed).length
-        } cambios`
-      );
-      console.table(rows);
-      console.groupEnd();
-    }
-
-    if (!changed) return false;
-
-    // Clonar nodos con nuevos tamaños
-    const newNodes = this.graph().nodes.map((n) => {
-      const row = rows.find((r) => r.id === n.id && r.changed);
-      return row
-        ? { ...n, width: row.nodeW_after, height: row.nodeH_after }
-        : { ...n };
-    });
-    this.graph.set({ ...this.graph(), nodes: newNodes });
-    return true;
+    if (log && rows.length) console.table(rows);
+    return changed;
   }
 
-  private cloneGraph(g: NormalizedGraph): NormalizedGraph {
-    return {
-      nodes: g.nodes.map((n) => ({ ...n })),
-      edges: g.edges.map((e) => ({ ...e })),
-      meta: g.meta ? { ...g.meta } : {},
-    };
-  }
-
-  /** Fuerza una medición y relayout manual (útil desde consola). */
-  public async forceMeasure() {
-    await this.nextFrame();
-    const changed = this.measureAndCloneNodes({ pass: 0, log: true });
-    if (changed) {
-      if (this.options().debug?.layout)
-        console.groupCollapsed('[layout] relayout (forceMeasure)');
-      const laid = await this.layoutService.layout(
-        this.graph(),
-        this.options()
-      );
-      this.graph.set(this.cloneGraph(laid));
-      if (this.options().debug?.layout) console.groupEnd();
-    } else {
-      console.info('[forceMeasure] sin cambios de tamaño detectados');
-    }
-  }
-
-  private nextFrame(): Promise<void> {
-    return new Promise((res) => requestAnimationFrame(() => res()));
-  }
-
-  // ===== Viewport / encuadre =====
+  // ===========================
+  // Viewport / encuadre
+  // ===========================
   private getViewportSize() {
-    const rect = this.rootRef.nativeElement.getBoundingClientRect();
+    const el = this.rootRef.nativeElement;
+    const rect = el.getBoundingClientRect();
     return { w: rect.width, h: rect.height };
   }
   private getGraphBounds() {
@@ -337,16 +301,20 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
 
     const first = this.nodes()[0];
     if (first) {
-      const s2 = this.scale();
-      this.tx.set(pad - (first.x ?? 0) * s2);
-      this.ty.set(pad - (first.y ?? 0) * s2);
+      const targetX = pad - (first.x ?? 0) * this.scale();
+      const targetY = pad - (first.y ?? 0) * this.scale();
+      this.tx.set(targetX);
+      this.ty.set(targetY);
     }
   }
 
-  // ===== Interacción =====
+  // ===========================
+  // Interacción (zoom/pan/centrado)
+  // ===========================
   onWheel(e: WheelEvent) {
     e.preventDefault();
-    const rect = this.rootRef.nativeElement.getBoundingClientRect();
+    const root = this.rootRef.nativeElement;
+    const rect = root.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
@@ -383,18 +351,30 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
   onDblClick() {
     const first = this.nodes()[0];
     if (!first) return;
-    const pad = 24,
-      s = this.scale();
-    this.tx.set(pad - (first.x ?? 0) * s);
-    this.ty.set(pad - (first.y ?? 0) * s);
+    const pad = 24;
+    const s = this.scale();
+    const targetX = pad - (first.x ?? 0) * s;
+    const targetY = pad - (first.y ?? 0) * s;
+    this.tx.set(targetX);
+    this.ty.set(targetY);
   }
 
-  // API pública
-  public zoomBy(factor: number, origin?: { x: number; y: number }) {
-    const rect = this.rootRef?.nativeElement.getBoundingClientRect();
-    if (!rect) return;
-    const mouseX = origin?.x ?? rect.width / 2;
-    const mouseY = origin?.y ?? rect.height / 2;
+  // API para toolbar externo (zoom/reset)
+  zoomIn() {
+    this.applyZoom(1.15);
+  }
+  zoomOut() {
+    this.applyZoom(1 / 1.15);
+  }
+  resetView() {
+    this.fitToView();
+  }
+
+  private applyZoom(factor: number) {
+    const root = this.rootRef.nativeElement;
+    const rect = root.getBoundingClientRect();
+    const mouseX = rect.width / 2;
+    const mouseY = rect.height / 2;
 
     const oldScale = this.scale();
     const newScale = Math.max(
@@ -407,14 +387,5 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     this.tx.set(mouseX - worldX * newScale);
     this.ty.set(mouseY - worldY * newScale);
     this.scale.set(newScale);
-  }
-  public zoomIn() {
-    this.zoomBy(1.1);
-  }
-  public zoomOut() {
-    this.zoomBy(1 / 1.1);
-  }
-  public resetView() {
-    this.onDblClick();
   }
 }

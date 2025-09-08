@@ -1,5 +1,5 @@
 // ============================================
-// projects/schema/src/lib/schema-card.component.ts — v0.3.8.2
+// projects/schema/src/lib/schema-card.component.ts — v0.3.8.5
 // ============================================
 
 import {
@@ -84,7 +84,7 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
         background: #fff;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
         user-select: none;
-        /* importante: NO forzar cortes globales; que decida el contenido */
+        box-sizing: border-box;
         word-break: normal;
         overflow-wrap: normal;
         overflow: hidden;
@@ -94,33 +94,55 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
         outline-offset: 0;
       }
 
+      /* + aire lateral (derecha más generoso) */
       .card-body {
-        padding: 12px;
+        padding: 12px 22px;
       }
+
       .card-title {
         font-weight: 700;
         font-size: 14px;
         margin-bottom: 6px;
       }
+
+      /* Filas key:value como grid estable */
       .card-preview {
         font-size: 12px;
-        line-height: 1.35;
+        line-height: 1.28;
       }
       .kv {
-        display: block;
-        margin: 2px 0;
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        column-gap: 10px; /* +gap entre clave y valor */
+        align-items: baseline;
+        margin: 3px 0;
+        padding-right: 8px; /* guarda interior contra el borde derecho */
       }
+
+      /* Clave: legible, consistente */
       .k {
         opacity: 0.66;
-        margin-right: 6px;
+        font-weight: 600;
+        font-size: 12px;
+      }
+
+      /* Valor: un poco menor + guard derecho explícito */
+      .v {
+        font-size: 10.75px;
+        line-height: 1.25;
+        letter-spacing: 0.1px;
+        padding-right: 6px;
+        display: inline-block;
       }
       .v-true {
         color: #16a34a;
         font-weight: 700;
+        font-size: 10.75px;
       }
       .v-false {
         color: #dc2626;
         font-weight: 700;
+        font-size: 10.75px;
       }
 
       .array-badges {
@@ -137,10 +159,10 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
         border-radius: 999px;
       }
 
-      /* 👇 Esto evita que CAI/port_name se partan en varias líneas */
+      /* Claves que NO deben partirse: fuerzan ensanche de la card */
       .nowrap {
-        white-space: nowrap;
-        word-break: normal !important;
+        white-space: nowrap !important;
+        word-break: keep-all !important;
         overflow-wrap: normal !important;
       }
 
