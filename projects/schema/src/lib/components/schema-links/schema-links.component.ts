@@ -49,48 +49,53 @@ export class SchemaLinksComponent {
   edges = input.required<SchemaEdge[]>();
   linkStroke = input<string>(DEFAULT_OPTIONS.linkStroke!);
   linkStrokeWidth = input<number>(DEFAULT_OPTIONS.linkStrokeWidth!);
-  options = input<SchemaOptions>(DEFAULT_OPTIONS); // para leer linkStyle
+  options = input<SchemaOptions>(DEFAULT_OPTIONS);
 
   @Input() width = 4000;
   @Input() height = 2000;
 
   @Output() linkClick = new EventEmitter<SchemaEdge>();
+
   pathFor(e: SchemaEdge): string {
     const pts = e.points ?? [];
-    const { linkStyle = 'orthogonal', curveTension = 80 } = this.options();
+    const {
+      linkStyle = 'orthogonal',
+      curveTension = 80,
+      straightThresholdDx = 160,
+    } = this.options();
     if (pts.length === 0) return '';
 
+    // --- CURVE (con fallback a recta si están cerca en X)
     if (linkStyle === 'curve') {
       const a = pts[0],
         b = pts[pts.length - 1];
-      const dx = b.x - a.x;
+      const dxAbs = Math.abs(b.x - a.x);
+      if (dxAbs < straightThresholdDx) {
+        return `M ${a.x},${a.y} L ${b.x},${b.y}`;
+      }
+      const t = Math.max(20, Math.min(200, curveTension));
+      const dir = Math.sign(b.x - a.x) || 1;
       const dy = b.y - a.y;
-
-      const t = Math.max(20, Math.min(200, curveTension)); // tensión horizontal
-      const bow = Math.max(12, Math.min(120, t * 0.6)); // “panza” vertical mínima
-
-      // puntos de control base (horizontales)
-      let c1x = a.x + Math.sign(dx || 1) * t,
+      let c1x = a.x + dir * t,
         c1y = a.y;
-      let c2x = b.x - Math.sign(dx || 1) * t,
+      let c2x = b.x - dir * t,
         c2y = b.y;
-
-      // 👇 Si están en la misma línea horizontal, forzamos curvatura vertical
       if (Math.abs(dy) < 1) {
+        const bow = Math.max(8, Math.min(96, t * 0.5));
         c1y = a.y - bow;
         c2y = b.y + bow;
       }
-
       return `M ${a.x},${a.y} C ${c1x},${c1y} ${c2x},${c2y} ${b.x},${b.y}`;
     }
 
+    // --- LINE (simple)
     if (linkStyle === 'line') {
       const a = pts[0],
         b = pts[pts.length - 1];
       return `M ${a.x},${a.y} L ${b.x},${b.y}`;
     }
 
-    // orthogonal (polyline de ELK)
+    // --- ORTHOGONAL: usar la polilínea tal cual (ya saneada en el service)
     if (pts.length === 1) return `M ${pts[0].x},${pts[0].y}`;
     const [first, ...rest] = pts;
     return `M ${first.x},${first.y} ${rest

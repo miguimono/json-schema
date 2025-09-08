@@ -79,6 +79,7 @@ export interface SchemaOptions {
   accentByKey?: string | null; // 👈 nueva
   titleMode?: TitleMode;
   layoutDirection?: LayoutDirection;
+  straightThresholdDx?: number;
 }
 
 export const DEFAULT_OPTIONS: SchemaOptions = {
@@ -100,4 +101,5 @@ export const DEFAULT_OPTIONS: SchemaOptions = {
   accentByKey: null,
   titleMode: 'auto',
   layoutDirection: 'RIGHT',
+  straightThresholdDx: 160,
 };
