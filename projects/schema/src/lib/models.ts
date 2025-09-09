@@ -57,6 +57,7 @@ export interface SchemaOptions {
   linkStyle?: LinkStyle;
   curveTension?: number;
   accentByKey?: string | null;
+  accentInverse?: boolean;
   titleMode?: TitleMode;
   layoutDirection?: LayoutDirection;
   straightThresholdDx?: number;
@@ -103,6 +104,7 @@ export const DEFAULT_OPTIONS: SchemaOptions = {
   linkStyle: 'orthogonal',
   curveTension: 80,
   accentByKey: null,
+  accentInverse: false,
   titleMode: 'auto',
   layoutDirection: 'RIGHT',
   straightThresholdDx: 160,

@@ -190,9 +190,15 @@ export class SchemaCardComponent {
     const k = this.options().accentByKey;
     if (!k) return '';
     const v = this.node()?.data?.[k];
-    if (v === true) return 'accent-true';
-    if (v === false) return 'accent-false';
-    return '';
+    if (this.options().accentInverse) {
+      if (v === true) return 'accent-false';
+      if (v === false) return 'accent-true';
+      return '';
+    } else {
+      if (v === true) return 'accent-true';
+      if (v === false) return 'accent-false';
+      return '';
+    }
   }
   isNoWrapKey(key: string): boolean {
     const list = this.options().noWrapKeys ?? [];
