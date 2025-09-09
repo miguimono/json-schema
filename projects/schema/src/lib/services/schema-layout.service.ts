@@ -1,7 +1,3 @@
-// ============================================
-// projects/schema/src/lib/schema-layout.service.ts — v0.3.8.2
-// ============================================
-
 import { Injectable } from '@angular/core';
 import ELK from 'elkjs/lib/elk.bundled.js';
 import { NormalizedGraph, SchemaOptions, DEFAULT_OPTIONS } from '../models';

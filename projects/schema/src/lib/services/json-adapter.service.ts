@@ -1,19 +1,3 @@
-// ============================================
-// projects/schema/src/lib/json-adapter.service.ts
-// ============================================
-// Transforma un JSON arbitrario en un grafo genérico (nodes/edges) independiente del dominio.
-// Reglas principales del modelado:
-//  - Un "nodo" (entidad) es cualquier objeto que tenga al menos un escalar (string/number/boolean).
-//  - El título del nodo se elige por prioridad (`titleKeyPriority`) o por el primer escalar encontrado.
-//  - Los atributos "preview" incluyen escalares (y arrays de escalares si está habilitado),
-//    excluyendo claves en `hiddenKeysGlobal` y, opcionalmente, el título usado.
-//  - Se crean aristas padre→hijo para objetos/elementos no escalares.
-//  - Se registran conteos de arrays no escalares en `jsonMeta.arrayCounts` (para "k: N items").
-//  - Soporta colapso de "wrappers" vacíos con un único hijo objeto (si `collapseSingleChildWrappers`).
-//
-// No modifica lógica: solo añade documentación JSDoc.
-// ============================================
-
 import { Injectable } from '@angular/core';
 import {
   DEFAULT_OPTIONS,

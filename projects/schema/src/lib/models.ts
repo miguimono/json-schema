@@ -1,7 +1,3 @@
-// ============================================
-// projects/schema/src/lib/models.ts — v0.3.8.6
-// ============================================
-
 export type LayoutAlign = 'firstChild' | 'center';
 export type LinkStyle = 'orthogonal' | 'curve' | 'line';
 export type TitleMode = 'auto' | 'none';

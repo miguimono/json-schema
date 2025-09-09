@@ -1,7 +1,3 @@
-// ============================================
-// projects/schema/src/lib/schema.component.ts — v0.3.8.6
-// ============================================
-
 import {
   AfterViewInit,
   ChangeDetectionStrategy,
@@ -26,7 +22,7 @@ import {
   SchemaNode,
   SchemaOptions,
 } from '../../models';
-import { CommonModule, NgFor, NgIf, NgTemplateOutlet } from '@angular/common';
+import { CommonModule, NgFor } from '@angular/common';
 import { SchemaCardComponent } from '../schema-card/schema-card.component';
 import { SchemaLinksComponent } from '../schema-links/schema-links.component';
 
@@ -45,7 +41,28 @@ import { SchemaLinksComponent } from '../schema-links/schema-links.component';
       (mouseleave)="onPointerUp()"
       (dblclick)="onDblClick()"
     >
-      <div class="stage" [style.transform]="transform()">
+      <div class="overlay loading" *ngIf="isLoading()">
+        <div class="loading-banner">
+          <div class="shimmer"></div>
+          <span class="msg">{{ loadingMessage() }}</span>
+        </div>
+      </div>
+
+      <div class="overlay empty" *ngIf="!isLoading() && data() == null">
+        <div class="empty-banner">{{ emptyMessage() }}</div>
+      </div>
+
+      <div class="overlay error" *ngIf="!isLoading() && isError()">
+        <div class="error-banner">
+          {{ errorMessage() }}
+        </div>
+      </div>
+
+      <div
+        class="stage"
+        [style.transform]="transform()"
+        *ngIf="!isLoading() && !isError()"
+      >
         <schema-links
           [edges]="edges()"
           [linkStroke]="linkStroke()"
@@ -85,6 +102,72 @@ import { SchemaLinksComponent } from '../schema-links/schema-links.component';
         height: 6000px;
         transform-origin: 0 0;
       }
+      /* ===== Overlays ===== */
+      .overlay {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        z-index: 10; /* por encima del stage */
+        pointer-events: none; /* no bloquear scroll/zoom, solo visual */
+      }
+      .loading-banner,
+      .empty-banner,
+      .error-banner {
+        pointer-events: auto;
+        border-radius: 10px;
+        padding: 16px 20px;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+        font-weight: 600;
+      }
+
+      /* Loading */
+      .loading .loading-banner {
+        width: min(720px, 90%);
+        background: #eee;
+        position: relative;
+        overflow: hidden;
+        color: #374151;
+      }
+      .loading .msg {
+        position: relative;
+        z-index: 1;
+      }
+      .loading .shimmer {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          to right,
+          #e0e0e0 8%,
+          #f0f0f0 18%,
+          #e0e0e0 33%
+        );
+        background-size: 1000px 100%;
+        animation: shimmer 3s infinite linear;
+        opacity: 0.9;
+      }
+      @keyframes shimmer {
+        0% {
+          background-position: -1000px 0;
+        }
+        100% {
+          background-position: 1000px 0;
+        }
+      }
+
+      /* Empty */
+      .empty .empty-banner {
+        background: #ffffff;
+        border: 1px dashed #cbd5e1;
+        color: #475569;
+      }
+
+      /* Error */
+      .error .error-banner {
+        background: #fff1f2;
+        border: 1px solid #fecdd3;
+        color: #b91c1c;
+      }
     `,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -99,6 +182,11 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
   linkStroke = input<string>(DEFAULT_OPTIONS.linkStroke!);
   linkStrokeWidth = input<number>(DEFAULT_OPTIONS.linkStrokeWidth!);
   cardTemplate = input<TemplateRef<any> | null>(null);
+  isLoading = input<boolean>(false);
+  isError = input<boolean>(false);
+  emptyMessage = input<string>('No hay datos para mostrar');
+  loadingMessage = input<string>('Cargando…');
+  errorMessage = input<string>('Error al cargar el esquema');
 
   // ===========================
   // Outputs
@@ -164,6 +252,8 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
   // Pipeline principal
   // ===========================
   private async compute(): Promise<void> {
+    if (this.isLoading()) return;
+    console.log('SchemaComponent: compute()', this.isLoading());
     const opts = this.options();
     const dbg = !!opts.debug?.measure;
 

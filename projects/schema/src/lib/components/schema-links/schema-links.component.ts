@@ -1,13 +1,3 @@
-// ============================================
-// projects/schema/src/lib/schema-links.component.ts
-// ============================================
-// Componente responsable de renderizar enlaces (aristas) como <path> dentro de un <svg>.
-// - Recibe las aristas ya con sus puntos calculados por el layout service.
-// - Soporta estilos de trazo: "orthogonal" | "curve" | "line".
-// - Emite linkClick al interactuar con un enlace.
-// Este archivo añade documentación JSDoc sin cambiar la lógica.
-// ============================================
-
 import {
   ChangeDetectionStrategy,
   Component,
