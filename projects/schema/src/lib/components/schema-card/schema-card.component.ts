@@ -45,6 +45,7 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
             *ngIf="node()?.jsonMeta?.attributes as attrs"
           >
             <div *ngFor="let kv of objToPairs(attrs)" class="kv">
+              @if (kv[0] != this.options().accentByKey) {
               <span class="k">{{ kv[0] }}:</span>
               <span
                 class="v"
@@ -54,6 +55,7 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
               >
                 {{ kv[1] }}
               </span>
+              }
             </div>
           </div>
 
@@ -190,6 +192,7 @@ export class SchemaCardComponent {
     const k = this.options().accentByKey;
     if (!k) return '';
     const v = this.node()?.data?.[k];
+    console.log('accentInverse', this.options().accentInverse);
     if (this.options().accentInverse) {
       if (v === true) return 'accent-false';
       if (v === false) return 'accent-true';
