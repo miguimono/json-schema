@@ -1,7 +1,7 @@
-export type LayoutAlign = 'firstChild' | 'center';
-export type LinkStyle = 'orthogonal' | 'curve' | 'line';
-export type TitleMode = 'auto' | 'none';
-export type LayoutDirection = 'RIGHT' | 'DOWN';
+export type LayoutAlign = "firstChild" | "center";
+export type LinkStyle = "orthogonal" | "curve" | "line";
+export type TitleMode = "auto" | "none";
+export type LayoutDirection = "RIGHT" | "DOWN";
 
 export interface SchemaNode {
   id: string;
@@ -11,7 +11,6 @@ export interface SchemaNode {
   jsonMeta?: {
     title?: string;
     attributes?: Record<string, any>;
-    preview?: string;
     childrenCount?: number;
     arrayCounts?: Record<string, number>;
   };
@@ -35,15 +34,17 @@ export interface NormalizedGraph {
   meta?: Record<string, any>;
 }
 
+/**
+ * Opciones internas (back-compat). Se siguen aceptando vía [options].
+ * Hoy se recomienda usar [settings] que las organiza.
+ */
 export interface SchemaOptions {
   // Extracción / preview
   titleKeyPriority: string[];
   hiddenKeysGlobal?: string[];
   collapseArrayContainers: boolean;
   collapseSingleChildWrappers: boolean;
-  edgeLabelFromContainerKey: boolean;
   maxDepth: number | null;
-  nodeIdStrategy: 'jsonpath';
   previewMaxKeys: number;
   treatScalarArraysAsAttribute: boolean;
 
@@ -57,6 +58,8 @@ export interface SchemaOptions {
   linkStyle?: LinkStyle;
   curveTension?: number;
   accentByKey?: string | null;
+  /** Pinta también el interior de la card (además del borde) según accentByKey */
+  accentFill?: boolean;
   accentInverse?: boolean;
   titleMode?: TitleMode;
   layoutDirection?: LayoutDirection;
@@ -85,28 +88,88 @@ export interface SchemaOptions {
   };
 }
 
+/**
+ * Nuevo contenedor organizado. Pásalo como [settings].
+ * Si no lo pasas, se usan defaults seguros.
+ */
+export interface SchemaSettings {
+  colors?: {
+    linkStroke?: string;
+    linkStrokeWidth?: number;
+    accentByKey?: string | null;
+    accentFill?: boolean;
+    accentInverse?: boolean;
+  };
+  layout?: {
+    layoutDirection?: LayoutDirection;
+    layoutAlign?: LayoutAlign;
+    linkStyle?: LinkStyle;
+    curveTension?: number;
+    straightThresholdDx?: number;
+    snapRootChildrenY?: boolean;
+    snapChainSegmentsY?: boolean;
+  };
+  dataView?: {
+    titleKeyPriority?: string[];
+    hiddenKeysGlobal?: string[];
+    titleMode?: TitleMode;
+    previewMaxKeys?: number;
+    treatScalarArraysAsAttribute?: boolean;
+    collapseArrayContainers?: boolean;
+    collapseSingleChildWrappers?: boolean;
+    maxDepth?: number | null;
+    defaultNodeSize?: { width: number; height: number };
+    noWrapKeys?: string[];
+    maxCardWidth?: number | null;
+    maxCardHeight?: number | null;
+    autoResizeCards?: boolean;
+    measureExtraWidthPx?: number;
+    measureExtraHeightPx?: number;
+  };
+  messages?: {
+    isLoading?: boolean;
+    isError?: boolean;
+    emptyMessage?: string;
+    loadingMessage?: string;
+    errorMessage?: string;
+  };
+  viewport?: {
+    /** Altura del viewport del esquema (px). Default 800. */
+    height?: number;
+    /** Altura mínima del viewport (px). Default 480. */
+    minHeight?: number;
+    /** Muestra la toolbar integrada. Default true. */
+    showToolbar?: boolean;
+  };
+  debug?: {
+    measure?: boolean;
+    layout?: boolean;
+    paintBounds?: boolean;
+    exposeOnWindow?: boolean;
+  };
+}
+
 export const DEFAULT_OPTIONS: SchemaOptions = {
-  titleKeyPriority: ['name', 'title', 'id', 'label'],
+  titleKeyPriority: ["name", "title", "id", "label"],
   hiddenKeysGlobal: [],
   collapseArrayContainers: true,
   collapseSingleChildWrappers: true,
-  edgeLabelFromContainerKey: false,
   maxDepth: null,
-  nodeIdStrategy: 'jsonpath',
   previewMaxKeys: 4,
   treatScalarArraysAsAttribute: true,
 
-  defaultNodeSize: { width: 320, height: 96 },
+  defaultNodeSize: { width: 220, height: 96 },
 
-  linkStroke: '#4CAF50',
-  linkStrokeWidth: 1.25,
-  layoutAlign: 'center',
-  linkStyle: 'orthogonal',
+  linkStroke: "#019df4",
+  linkStrokeWidth: 2,
+  layoutAlign: "center",
+  linkStyle: "orthogonal",
   curveTension: 80,
   accentByKey: null,
+  accentFill: false,
   accentInverse: false,
-  titleMode: 'auto',
-  layoutDirection: 'RIGHT',
+  titleMode: "auto",
+  layoutDirection: "RIGHT",
   straightThresholdDx: 160,
 
   autoResizeCards: true,
@@ -117,7 +180,6 @@ export const DEFAULT_OPTIONS: SchemaOptions = {
   snapRootChildrenY: false,
   snapChainSegmentsY: true,
 
-  // 👇 Colchón por defecto (“aire” adicional)
   measureExtraWidthPx: 24,
   measureExtraHeightPx: 0,
 

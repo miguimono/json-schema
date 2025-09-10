@@ -6,7 +6,7 @@ import {
   TemplateRef,
   input,
 } from '@angular/core';
-import { DEFAULT_OPTIONS, SchemaNode, SchemaOptions } from '../../models';
+import { DEFAULT_OPTIONS, SchemaNode, SchemaOptions } from '../models';
 import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
 
 @Component({
@@ -18,7 +18,7 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
       class="schema-card"
       [class.debug-outline]="options().debug?.paintBounds"
       [attr.data-node-id]="node()?.id"
-      [ngClass]="getAccentClass()"
+      [ngClass]="getAccentClasses()"
       [style.left.px]="node()?.x"
       [style.top.px]="node()?.y"
       [style.width.px]="node()?.width"
@@ -89,7 +89,6 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
       }
       .debug-outline {
         outline: 2px dashed #ef4444;
-        outline-offset: 0;
       }
 
       .card-body {
@@ -101,14 +100,13 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
         margin-bottom: 6px;
       }
 
-      /* 🔧 Grid compacto: la card se ENCOGE a su contenido */
       .card-preview {
         font-size: 12px;
         line-height: 1.28;
       }
       .kv {
         display: grid;
-        grid-template-columns: max-content max-content; /* <- antes: max-content 1fr */
+        grid-template-columns: max-content max-content;
         column-gap: 10px;
         align-items: baseline;
         margin: 3px 0;
@@ -130,12 +128,10 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
       .v-true {
         color: #16a34a;
         font-weight: 700;
-        font-size: 10.75px;
       }
       .v-false {
         color: #dc2626;
         font-weight: 700;
-        font-size: 10.75px;
       }
 
       .array-badges {
@@ -152,20 +148,35 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
         border-radius: 999px;
       }
 
-      /* No partir estas claves: fuerzan ensanche solo cuando lo necesitan */
       .nowrap {
         white-space: nowrap !important;
         word-break: keep-all !important;
         overflow-wrap: normal !important;
       }
 
+      /* Acentos por booleano */
       .schema-card.accent-true {
-        border-color: #16a34a;
+        border-color: #16a34a; /* green-600 */
         box-shadow: 0 2px 10px rgba(22, 163, 74, 0.15);
       }
       .schema-card.accent-false {
-        border-color: #dc2626;
+        border-color: #dc2626; /* red-600 */
         box-shadow: 0 2px 10px rgba(220, 38, 38, 0.15);
+      }
+      .schema-card.accent-null {
+        border-color: #f59e0b; /* amber-500 */
+        box-shadow: 0 2px 10px rgba(245, 158, 11, 0.15);
+      }
+
+      /* 🎨 Relleno opcional cuando accentFill=true */
+      .schema-card.accent-fill-true {
+        background: rgba(22, 163, 74, 0.1); /* verde suave */
+      }
+      .schema-card.accent-fill-false {
+        background: rgba(220, 38, 38, 0.1); /* rojo suave */
+      }
+      .schema-card.accent-fill-null {
+        background: rgba(245, 158, 11, 0.1); /* naranja suave */
       }
     `,
   ],
@@ -188,19 +199,31 @@ export class SchemaCardComponent {
   objToPairs(obj: Record<string, any>) {
     return Object.entries(obj);
   }
-  getAccentClass(): string {
+  getAccentClasses(): string[] {
     const k = this.options().accentByKey;
-    if (!k) return '';
+    if (!k) return [];
     const v = this.node()?.data?.[k];
-    console.log('accentInverse', this.options().accentInverse);
+    const classes: string[] = [];
     if (this.options().accentInverse) {
-      if (v === true) return 'accent-false';
-      if (v === false) return 'accent-true';
-      return '';
+      if (v === true) classes.push('accent-false');
+      if (v === false) classes.push('accent-true');
+      if (v === null) classes.push('accent-null');
+      if (this.options().accentFill) {
+        if (v === true) classes.push('accent-fill-false');
+        if (v === false) classes.push('accent-fill-true');
+        if (v === null) classes.push('accent-fill-null');
+      }
+      return classes;
     } else {
-      if (v === true) return 'accent-true';
-      if (v === false) return 'accent-false';
-      return '';
+      if (v === true) classes.push('accent-true');
+      if (v === false) classes.push('accent-false');
+      if (v === null) classes.push('accent-null');
+      if (this.options().accentFill) {
+        if (v === true) classes.push('accent-fill-true');
+        if (v === false) classes.push('accent-fill-false');
+        if (v === null) classes.push('accent-fill-null');
+      }
+      return classes;
     }
   }
   isNoWrapKey(key: string): boolean {
