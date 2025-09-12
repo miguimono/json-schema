@@ -381,6 +381,10 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
         s.colors?.showColorFalse ??
         flat.showColorFalse ??
         DEFAULT_OPTIONS.showColorFalse,
+      showColorNull:
+        s.colors?.showColorNull ??
+        flat.showColorNull ??
+        DEFAULT_OPTIONS.showColorNull,
       // layout vis
       layoutDirection:
         s.layout?.layoutDirection ??
