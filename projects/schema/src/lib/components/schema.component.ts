@@ -12,18 +12,31 @@ import {
   input,
   signal,
   computed,
-} from "@angular/core";
-import { JsonAdapterService } from "../services/json-adapter.service";
-import { SchemaLayoutService } from "../services/schema-layout.service";
-import { DEFAULT_OPTIONS, NormalizedGraph, SchemaEdge, SchemaNode, SchemaOptions, SchemaSettings } from "../models";
-import { CommonModule, NgFor, NgIf } from "@angular/common";
-import { SchemaCardComponent } from "./schema-card.component";
-import { SchemaLinksComponent } from "./schema-links.component";
+} from '@angular/core';
+import { JsonAdapterService } from '../services/json-adapter.service';
+import { SchemaLayoutService } from '../services/schema-layout.service';
+import {
+  DEFAULT_OPTIONS,
+  NormalizedGraph,
+  SchemaEdge,
+  SchemaNode,
+  SchemaOptions,
+  SchemaSettings,
+} from '../models';
+import { CommonModule, NgFor, NgIf } from '@angular/common';
+import { SchemaCardComponent } from './schema-card.component';
+import { SchemaLinksComponent } from './schema-links.component';
 
 @Component({
-  selector: "schema",
+  selector: 'schema',
   standalone: true,
-  imports: [CommonModule, NgFor, NgIf, SchemaCardComponent, SchemaLinksComponent],
+  imports: [
+    CommonModule,
+    NgFor,
+    NgIf,
+    SchemaCardComponent,
+    SchemaLinksComponent,
+  ],
   template: `
     <div
       class="schema-root"
@@ -38,7 +51,10 @@ import { SchemaLinksComponent } from "./schema-links.component";
       [style.minHeight.px]="minViewportHeight()"
     >
       <!-- ===== Toolbar integrada (opcional) ===== -->
-      <div class="schema-toolbar" *ngIf="showToolbar() && !isLoadingView() && !isErrorView()">
+      <div
+        class="schema-toolbar"
+        *ngIf="showToolbar() && !isLoadingView() && !isErrorView()"
+      >
         <div class="left">
           <button type="button" (click)="zoomOut()" title="Zoom out">−</button>
           <button type="button" (click)="zoomIn()" title="Zoom in">+</button>
@@ -48,7 +64,11 @@ import { SchemaLinksComponent } from "./schema-links.component";
         <div class="right">
           <label>
             Enlaces:
-            <select #ls [value]="opt_linkStyle()" (change)="setLinkStyle(ls.value)">
+            <select
+              #ls
+              [value]="opt_linkStyle()"
+              (change)="setLinkStyle(ls.value)"
+            >
               <option value="orthogonal">Ortogonal</option>
               <option value="curve">Curvo</option>
               <option value="line">Lineal</option>
@@ -57,7 +77,11 @@ import { SchemaLinksComponent } from "./schema-links.component";
 
           <label>
             Alineación:
-            <select #la [value]="opt_layoutAlign()" (change)="setLayoutAlign(la.value)">
+            <select
+              #la
+              [value]="opt_layoutAlign()"
+              (change)="setLayoutAlign(la.value)"
+            >
               <option value="firstChild">Superior</option>
               <option value="center">Centrado</option>
             </select>
@@ -84,7 +108,11 @@ import { SchemaLinksComponent } from "./schema-links.component";
       </div>
 
       <!-- ===== Stage ===== -->
-      <div class="stage" [style.transform]="transform()" *ngIf="!isLoadingView() && !isErrorView()">
+      <div
+        class="stage"
+        [style.transform]="transform()"
+        *ngIf="!isLoadingView() && !isErrorView()"
+      >
         <schema-links
           [edges]="edges()"
           [options]="effectiveOptions()"
@@ -192,7 +220,12 @@ import { SchemaLinksComponent } from "./schema-links.component";
       .loading .shimmer {
         position: absolute;
         inset: 0;
-        background: linear-gradient(to right, #e0e0e0 8%, #f0f0f0 18%, #e0e0e0 33%);
+        background: linear-gradient(
+          to right,
+          #e0e0e0 8%,
+          #f0f0f0 18%,
+          #e0e0e0 33%
+        );
         background-size: 1000px 100%;
         animation: shimmer 3s infinite linear;
         opacity: 0.9;
@@ -235,9 +268,9 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
   // Mensajes/estados (pueden venir por settings.messages también)
   isLoading = input<boolean>(false);
   isError = input<boolean>(false);
-  emptyMessage = input<string>("No hay datos para mostrar");
-  loadingMessage = input<string>("Cargando…");
-  errorMessage = input<string>("Error al cargar el esquema");
+  emptyMessage = input<string>('No hay datos para mostrar');
+  loadingMessage = input<string>('Cargando…');
+  errorMessage = input<string>('Error al cargar el esquema');
 
   // Viewport (pueden venir por settings.viewport)
   viewportHeight = signal<number>(800);
@@ -253,14 +286,16 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
   nodes = computed(() => this.graph().nodes);
   edges = computed(() => this.graph().edges);
 
-  @ViewChild("root", { static: true }) rootRef!: ElementRef<HTMLElement>;
+  @ViewChild('root', { static: true }) rootRef!: ElementRef<HTMLElement>;
 
   private scale = signal(1);
   private minScale = signal(0.2);
   private maxScale = signal(3);
   private tx = signal(0);
   private ty = signal(0);
-  transform = computed(() => `translate(${this.tx()}px, ${this.ty()}px) scale(${this.scale()})`);
+  transform = computed(
+    () => `translate(${this.tx()}px, ${this.ty()}px) scale(${this.scale()})`
+  );
 
   virtualWidth = 12000;
   virtualHeight = 6000;
@@ -270,19 +305,29 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
   private lastY = 0;
 
   // Controles de toolbar (valores actuales)
-  opt_linkStyle = signal<"orthogonal" | "curve" | "line">("orthogonal");
-  opt_layoutAlign = signal<"firstChild" | "center">("center");
+  opt_linkStyle = signal<'orthogonal' | 'curve' | 'line'>('orthogonal');
+  opt_layoutAlign = signal<'firstChild' | 'center'>('center');
 
   // ======= Derivados (no escribimos sobre inputs) =======
-  isLoadingView = computed(() => this.settings()?.messages?.isLoading ?? this.isLoading());
-  isErrorView = computed(() => this.settings()?.messages?.isError ?? this.isError());
-  emptyMessageView = computed(() => this.settings()?.messages?.emptyMessage ?? this.emptyMessage());
-  loadingMessageView = computed(() => this.settings()?.messages?.loadingMessage ?? this.loadingMessage());
-  errorMessageView = computed(() => this.settings()?.messages?.errorMessage ?? this.errorMessage());
+  isLoadingView = computed(
+    () => this.settings()?.messages?.isLoading ?? this.isLoading()
+  );
+  isErrorView = computed(
+    () => this.settings()?.messages?.isError ?? this.isError()
+  );
+  emptyMessageView = computed(
+    () => this.settings()?.messages?.emptyMessage ?? this.emptyMessage()
+  );
+  loadingMessageView = computed(
+    () => this.settings()?.messages?.loadingMessage ?? this.loadingMessage()
+  );
+  errorMessageView = computed(
+    () => this.settings()?.messages?.errorMessage ?? this.errorMessage()
+  );
 
   constructor(
     private adapter: JsonAdapterService,
-    private layoutService: SchemaLayoutService,
+    private layoutService: SchemaLayoutService
   ) {}
 
   // ===== Merge de settings → options + UI =====
@@ -300,8 +345,8 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     }
     // toolbar selectors
     const base = this.effectiveOptions();
-    this.opt_linkStyle.set(base.linkStyle ?? "orthogonal");
-    this.opt_layoutAlign.set(base.layoutAlign ?? "center");
+    this.opt_linkStyle.set(base.linkStyle ?? 'orthogonal');
+    this.opt_layoutAlign.set(base.layoutAlign ?? 'center');
   }
 
   /** Combina DEFAULT_OPTIONS + options (back-compat) + settings.{colors,layout,dataView,debug} */
@@ -312,51 +357,126 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
       ...DEFAULT_OPTIONS,
       ...flat,
       // colors
-      linkStroke: s.colors?.linkStroke ?? flat.linkStroke ?? DEFAULT_OPTIONS.linkStroke,
-      linkStrokeWidth: s.colors?.linkStrokeWidth ?? flat.linkStrokeWidth ?? DEFAULT_OPTIONS.linkStrokeWidth,
-      accentByKey: s.colors?.accentByKey ?? flat.accentByKey ?? DEFAULT_OPTIONS.accentByKey,
-      accentInverse: s.colors?.accentInverse ?? flat.accentInverse ?? DEFAULT_OPTIONS.accentInverse,
-      accentFill: s.colors?.accentFill ?? flat.accentFill ?? DEFAULT_OPTIONS.accentFill,
+      linkStroke:
+        s.colors?.linkStroke ?? flat.linkStroke ?? DEFAULT_OPTIONS.linkStroke,
+      linkStrokeWidth:
+        s.colors?.linkStrokeWidth ??
+        flat.linkStrokeWidth ??
+        DEFAULT_OPTIONS.linkStrokeWidth,
+      accentByKey:
+        s.colors?.accentByKey ??
+        flat.accentByKey ??
+        DEFAULT_OPTIONS.accentByKey,
+      accentFill:
+        s.colors?.accentFill ?? flat.accentFill ?? DEFAULT_OPTIONS.accentFill,
+      accentInverse:
+        s.colors?.accentInverse ??
+        flat.accentInverse ??
+        DEFAULT_OPTIONS.accentInverse,
+      showColorTrue:
+        s.colors?.showColorTrue ??
+        flat.showColorTrue ??
+        DEFAULT_OPTIONS.showColorTrue,
+      showColorFalse:
+        s.colors?.showColorFalse ??
+        flat.showColorFalse ??
+        DEFAULT_OPTIONS.showColorFalse,
       // layout vis
-      layoutDirection: s.layout?.layoutDirection ?? flat.layoutDirection ?? DEFAULT_OPTIONS.layoutDirection,
+      layoutDirection:
+        s.layout?.layoutDirection ??
+        flat.layoutDirection ??
+        DEFAULT_OPTIONS.layoutDirection,
       layoutAlign: s.layout?.layoutAlign ?? this.opt_layoutAlign(),
       linkStyle: s.layout?.linkStyle ?? this.opt_linkStyle(),
-      curveTension: s.layout?.curveTension ?? flat.curveTension ?? DEFAULT_OPTIONS.curveTension,
+      curveTension:
+        s.layout?.curveTension ??
+        flat.curveTension ??
+        DEFAULT_OPTIONS.curveTension,
       straightThresholdDx:
-        s.layout?.straightThresholdDx ?? flat.straightThresholdDx ?? DEFAULT_OPTIONS.straightThresholdDx,
-      snapRootChildrenY: s.layout?.snapRootChildrenY ?? flat.snapRootChildrenY ?? DEFAULT_OPTIONS.snapRootChildrenY,
-      snapChainSegmentsY: s.layout?.snapChainSegmentsY ?? flat.snapChainSegmentsY ?? DEFAULT_OPTIONS.snapChainSegmentsY,
+        s.layout?.straightThresholdDx ??
+        flat.straightThresholdDx ??
+        DEFAULT_OPTIONS.straightThresholdDx,
+      snapRootChildrenY:
+        s.layout?.snapRootChildrenY ??
+        flat.snapRootChildrenY ??
+        DEFAULT_OPTIONS.snapRootChildrenY,
+      snapChainSegmentsY:
+        s.layout?.snapChainSegmentsY ??
+        flat.snapChainSegmentsY ??
+        DEFAULT_OPTIONS.snapChainSegmentsY,
       // dataview
-      titleKeyPriority: s.dataView?.titleKeyPriority ?? flat.titleKeyPriority ?? DEFAULT_OPTIONS.titleKeyPriority,
-      hiddenKeysGlobal: s.dataView?.hiddenKeysGlobal ?? flat.hiddenKeysGlobal ?? DEFAULT_OPTIONS.hiddenKeysGlobal,
-      titleMode: s.dataView?.titleMode ?? flat.titleMode ?? DEFAULT_OPTIONS.titleMode,
-      previewMaxKeys: s.dataView?.previewMaxKeys ?? flat.previewMaxKeys ?? DEFAULT_OPTIONS.previewMaxKeys,
+      titleKeyPriority:
+        s.dataView?.titleKeyPriority ??
+        flat.titleKeyPriority ??
+        DEFAULT_OPTIONS.titleKeyPriority,
+      hiddenKeysGlobal:
+        s.dataView?.hiddenKeysGlobal ??
+        flat.hiddenKeysGlobal ??
+        DEFAULT_OPTIONS.hiddenKeysGlobal,
+      titleMode:
+        s.dataView?.titleMode ?? flat.titleMode ?? DEFAULT_OPTIONS.titleMode,
+      previewMaxKeys:
+        s.dataView?.previewMaxKeys ??
+        flat.previewMaxKeys ??
+        DEFAULT_OPTIONS.previewMaxKeys,
       treatScalarArraysAsAttribute:
         s.dataView?.treatScalarArraysAsAttribute ??
         flat.treatScalarArraysAsAttribute ??
         DEFAULT_OPTIONS.treatScalarArraysAsAttribute,
       collapseArrayContainers:
-        s.dataView?.collapseArrayContainers ?? flat.collapseArrayContainers ?? DEFAULT_OPTIONS.collapseArrayContainers,
+        s.dataView?.collapseArrayContainers ??
+        flat.collapseArrayContainers ??
+        DEFAULT_OPTIONS.collapseArrayContainers,
       collapseSingleChildWrappers:
         s.dataView?.collapseSingleChildWrappers ??
         flat.collapseSingleChildWrappers ??
         DEFAULT_OPTIONS.collapseSingleChildWrappers,
-      maxDepth: s.dataView?.maxDepth ?? flat.maxDepth ?? DEFAULT_OPTIONS.maxDepth,
-      defaultNodeSize: s.dataView?.defaultNodeSize ?? flat.defaultNodeSize ?? DEFAULT_OPTIONS.defaultNodeSize,
-      noWrapKeys: s.dataView?.noWrapKeys ?? flat.noWrapKeys ?? DEFAULT_OPTIONS.noWrapKeys,
-      maxCardWidth: s.dataView?.maxCardWidth ?? flat.maxCardWidth ?? DEFAULT_OPTIONS.maxCardWidth,
-      maxCardHeight: s.dataView?.maxCardHeight ?? flat.maxCardHeight ?? DEFAULT_OPTIONS.maxCardHeight,
-      autoResizeCards: s.dataView?.autoResizeCards ?? flat.autoResizeCards ?? DEFAULT_OPTIONS.autoResizeCards,
+      maxDepth:
+        s.dataView?.maxDepth ?? flat.maxDepth ?? DEFAULT_OPTIONS.maxDepth,
+      defaultNodeSize:
+        s.dataView?.defaultNodeSize ??
+        flat.defaultNodeSize ??
+        DEFAULT_OPTIONS.defaultNodeSize,
+      noWrapKeys:
+        s.dataView?.noWrapKeys ?? flat.noWrapKeys ?? DEFAULT_OPTIONS.noWrapKeys,
+      maxCardWidth:
+        s.dataView?.maxCardWidth ??
+        flat.maxCardWidth ??
+        DEFAULT_OPTIONS.maxCardWidth,
+      maxCardHeight:
+        s.dataView?.maxCardHeight ??
+        flat.maxCardHeight ??
+        DEFAULT_OPTIONS.maxCardHeight,
+      autoResizeCards:
+        s.dataView?.autoResizeCards ??
+        flat.autoResizeCards ??
+        DEFAULT_OPTIONS.autoResizeCards,
       measureExtraWidthPx:
-        s.dataView?.measureExtraWidthPx ?? flat.measureExtraWidthPx ?? DEFAULT_OPTIONS.measureExtraWidthPx,
+        s.dataView?.measureExtraWidthPx ??
+        flat.measureExtraWidthPx ??
+        DEFAULT_OPTIONS.measureExtraWidthPx,
       measureExtraHeightPx:
-        s.dataView?.measureExtraHeightPx ?? flat.measureExtraHeightPx ?? DEFAULT_OPTIONS.measureExtraHeightPx,
+        s.dataView?.measureExtraHeightPx ??
+        flat.measureExtraHeightPx ??
+        DEFAULT_OPTIONS.measureExtraHeightPx,
       // debug
       debug: {
-        measure: s.debug?.measure ?? flat.debug?.measure ?? DEFAULT_OPTIONS.debug?.measure,
-        layout: s.debug?.layout ?? flat.debug?.layout ?? DEFAULT_OPTIONS.debug?.layout,
-        paintBounds: s.debug?.paintBounds ?? flat.debug?.paintBounds ?? DEFAULT_OPTIONS.debug?.paintBounds,
-        exposeOnWindow: s.debug?.exposeOnWindow ?? flat.debug?.exposeOnWindow ?? DEFAULT_OPTIONS.debug?.exposeOnWindow,
+        measure:
+          s.debug?.measure ??
+          flat.debug?.measure ??
+          DEFAULT_OPTIONS.debug?.measure,
+        layout:
+          s.debug?.layout ??
+          flat.debug?.layout ??
+          DEFAULT_OPTIONS.debug?.layout,
+        paintBounds:
+          s.debug?.paintBounds ??
+          flat.debug?.paintBounds ??
+          DEFAULT_OPTIONS.debug?.paintBounds,
+        exposeOnWindow:
+          s.debug?.exposeOnWindow ??
+          flat.debug?.exposeOnWindow ??
+          DEFAULT_OPTIONS.debug?.exposeOnWindow,
       },
     };
     return merged;
@@ -423,7 +543,7 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
         options: opts,
       };
       // eslint-disable-next-line no-console
-      console.log("schemaDebug disponible en window.schemaDebug");
+      console.log('schemaDebug disponible en window.schemaDebug');
     }
   }
 
@@ -434,13 +554,15 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     const extraH = opts.measureExtraHeightPx ?? 0;
 
     const root = this.rootRef.nativeElement;
-    const cards = Array.from(root.querySelectorAll<HTMLElement>(".schema-card"));
+    const cards = Array.from(
+      root.querySelectorAll<HTMLElement>('.schema-card')
+    );
 
     const map = new Map(this.graph().nodes.map((n) => [n.id, n]));
     let changed = false;
 
     for (const el of cards) {
-      const id = el.getAttribute("data-node-id") ?? undefined;
+      const id = el.getAttribute('data-node-id') ?? undefined;
       const node = (id ? map.get(id) : undefined) ?? null;
       if (!node) continue;
 
@@ -514,7 +636,10 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
 
     const oldScale = this.scale();
     const factor = 1 + (-e.deltaY > 0 ? 0.08 : -0.08);
-    const newScale = Math.max(this.minScale(), Math.min(this.maxScale(), oldScale * factor));
+    const newScale = Math.max(
+      this.minScale(),
+      Math.min(this.maxScale(), oldScale * factor)
+    );
 
     const worldX = (mouseX - this.tx()) / oldScale;
     const worldY = (mouseY - this.ty()) / oldScale;
@@ -566,7 +691,10 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     const mouseY = rect.height / 2;
 
     const oldScale = this.scale();
-    const newScale = Math.max(this.minScale(), Math.min(this.maxScale(), oldScale * factor));
+    const newScale = Math.max(
+      this.minScale(),
+      Math.min(this.maxScale(), oldScale * factor)
+    );
 
     const worldX = (mouseX - this.tx()) / oldScale;
     const worldY = (mouseY - this.ty()) / oldScale;
@@ -577,13 +705,13 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
 
   // Toolbar: selectores
   setLinkStyle(v: string) {
-    const ok = v === "orthogonal" || v === "curve" || v === "line";
-    this.opt_linkStyle.set(ok ? (v as any) : "orthogonal");
+    const ok = v === 'orthogonal' || v === 'curve' || v === 'line';
+    this.opt_linkStyle.set(ok ? (v as any) : 'orthogonal');
     this.compute();
   }
   setLayoutAlign(v: string) {
-    const ok = v === "firstChild" || v === "center";
-    this.opt_layoutAlign.set(ok ? (v as any) : "center");
+    const ok = v === 'firstChild' || v === 'center';
+    this.opt_layoutAlign.set(ok ? (v as any) : 'center');
     this.compute();
   }
 }

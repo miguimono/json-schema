@@ -1,7 +1,7 @@
-export type LayoutAlign = "firstChild" | "center";
-export type LinkStyle = "orthogonal" | "curve" | "line";
-export type TitleMode = "auto" | "none";
-export type LayoutDirection = "RIGHT" | "DOWN";
+export type LayoutAlign = 'firstChild' | 'center';
+export type LinkStyle = 'orthogonal' | 'curve' | 'line';
+export type TitleMode = 'auto' | 'none';
+export type LayoutDirection = 'RIGHT' | 'DOWN';
 
 export interface SchemaNode {
   id: string;
@@ -61,6 +61,9 @@ export interface SchemaOptions {
   /** Pinta también el interior de la card (además del borde) según accentByKey */
   accentFill?: boolean;
   accentInverse?: boolean;
+  showColorTrue?: boolean;
+  showColorFalse?: boolean;
+  showColorNull?: boolean;
   titleMode?: TitleMode;
   layoutDirection?: LayoutDirection;
   straightThresholdDx?: number;
@@ -99,6 +102,9 @@ export interface SchemaSettings {
     accentByKey?: string | null;
     accentFill?: boolean;
     accentInverse?: boolean;
+    showColorTrue?: boolean;
+    showColorFalse?: boolean;
+    showColorNull?: boolean;
   };
   layout?: {
     layoutDirection?: LayoutDirection;
@@ -150,7 +156,7 @@ export interface SchemaSettings {
 }
 
 export const DEFAULT_OPTIONS: SchemaOptions = {
-  titleKeyPriority: ["name", "title", "id", "label"],
+  titleKeyPriority: ['name', 'title', 'id', 'label'],
   hiddenKeysGlobal: [],
   collapseArrayContainers: true,
   collapseSingleChildWrappers: true,
@@ -160,16 +166,19 @@ export const DEFAULT_OPTIONS: SchemaOptions = {
 
   defaultNodeSize: { width: 220, height: 96 },
 
-  linkStroke: "#019df4",
+  linkStroke: '#019df4',
   linkStrokeWidth: 2,
-  layoutAlign: "center",
-  linkStyle: "orthogonal",
+  layoutAlign: 'center',
+  linkStyle: 'orthogonal',
   curveTension: 80,
   accentByKey: null,
   accentFill: false,
   accentInverse: false,
-  titleMode: "auto",
-  layoutDirection: "RIGHT",
+  showColorTrue: false,
+  showColorFalse: false,
+  showColorNull: false,
+  titleMode: 'auto',
+  layoutDirection: 'RIGHT',
   straightThresholdDx: 160,
 
   autoResizeCards: true,

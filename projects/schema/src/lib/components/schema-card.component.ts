@@ -205,23 +205,35 @@ export class SchemaCardComponent {
     const v = this.node()?.data?.[k];
     const classes: string[] = [];
     if (this.options().accentInverse) {
-      if (v === true) classes.push('accent-false');
-      if (v === false) classes.push('accent-true');
-      if (v === null) classes.push('accent-null');
+      if (v === true && this.options().showColorTrue)
+        classes.push('accent-false');
+      if (v === false && this.options().showColorFalse)
+        classes.push('accent-true');
+      if (v === null && this.options().showColorNull)
+        classes.push('accent-null');
       if (this.options().accentFill) {
-        if (v === true) classes.push('accent-fill-false');
-        if (v === false) classes.push('accent-fill-true');
-        if (v === null) classes.push('accent-fill-null');
+        if (v === true && this.options().showColorTrue)
+          classes.push('accent-fill-false');
+        if (v === false && this.options().showColorFalse)
+          classes.push('accent-fill-true');
+        if (v === null && this.options().showColorNull)
+          classes.push('accent-fill-null');
       }
       return classes;
     } else {
-      if (v === true) classes.push('accent-true');
-      if (v === false) classes.push('accent-false');
-      if (v === null) classes.push('accent-null');
+      if (v === true && this.options().showColorTrue)
+        classes.push('accent-true');
+      if (v === false && this.options().showColorFalse)
+        classes.push('accent-false');
+      if (v === null && this.options().showColorNull)
+        classes.push('accent-null');
       if (this.options().accentFill) {
-        if (v === true) classes.push('accent-fill-true');
-        if (v === false) classes.push('accent-fill-false');
-        if (v === null) classes.push('accent-fill-null');
+        if (v === true && this.options().showColorTrue)
+          classes.push('accent-fill-true');
+        if (v === false && this.options().showColorFalse)
+          classes.push('accent-fill-false');
+        if (v === null && this.options().showColorNull)
+          classes.push('accent-fill-null');
       }
       return classes;
     }
