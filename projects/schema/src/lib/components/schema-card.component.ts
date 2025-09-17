@@ -14,24 +14,35 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
 /**
  * Componente visual para renderizar un {@link SchemaNode} como card.
  *
- * Características:
- * - Muestra título (si titleMode !== 'none').
- * - Vista previa de atributos (jsonMeta.attributes).
- * - Badges de conteo de arrays no escalares (jsonMeta.arrayCounts).
- * - Overlay de botón colapsar/expandir (si `showCollapseControls` y `hasChildren`).
- * - Emite `nodeClick` y `toggleRequest` sin interferir con el template.
+ * ### Responsabilidades
+ * - Renderiza un nodo con **título** (si `titleMode !== 'none'`), **preview** de atributos
+ *   (`jsonMeta.attributes`) y **badges** con conteos de arrays no escalares (`jsonMeta.arrayCounts`).
+ * - Permite **template custom** vía `cardTemplate` (inserta el nodo como `$implicit`).
+ * - Expone **acentos visuales** según `accentByKey` y flags (`accentFill`, `accentInverse`,
+ *   `showColorTrue/False/Null`).
+ * - Muestra un **botón de colapso/expansión** overlay cuando:
+ *     - `showCollapseControls === true` **y**
+ *     - `hasChildren === true`.
+ *   El botón **no interfiere** con el contenido del template.
+ * - Emite `nodeClick` y `toggleRequest` sin burbujas de eventos.
  *
- * Inputs:
- * - node:           nodo que se renderiza (requerido)
- * - cardTemplate:   ng-template opcional para customizar el contenido
- * - options:        opciones (colors, layout, dataView)
- * - hasChildren:    si el nodo tiene hijos en el grafo completo
- * - showCollapseControls: muestra el botón si true
- * - isCollapsed:    estado visual del toggle (rotación del icono)
+ * ### Inputs
+ * - `node`: nodo actual a renderizar.
+ * - `cardTemplate`: ng-template custom (opcional).
+ * - `options`: opciones efectivas (mergeadas) de estilo/preview/layout.
+ * - `hasChildren`: indica si el nodo tiene hijos en el grafo completo (para mostrar el botón).
+ * - `showCollapseControls`: fuerza la visibilidad del botón (controlado por el contenedor).
+ * - `isCollapsed`: estado visual para rotar el ícono del botón.
  *
- * Outputs:
- * - nodeClick(node): selección del nodo
- * - toggleRequest(node): solicitud de colapso/expansión
+ * ### Outputs
+ * - `nodeClick(SchemaNode)`: emitido al click sobre la card (selección).
+ * - `toggleRequest(SchemaNode)`: emitido al click del botón overlay de colapso/expansión.
+ *
+ * ### Accesibilidad
+ * - El botón tiene `aria-pressed` según `isCollapsed`.
+ *
+ * ### Rendimiento
+ * - `ChangeDetectionStrategy.OnPush` para minimizar recalculos.
  */
 @Component({
   selector: 'schema-card',
@@ -231,49 +242,106 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
 })
 export class SchemaCardComponent {
   // ===== Inputs =====
-  /** Nodo que se va a renderizar. */
+
+  /**
+   * Nodo que se va a renderizar.
+   * @required
+   * @remarks Debe contener `jsonMeta` si se desea mostrar título/preview por defecto.
+   */
   node = input.required<SchemaNode>();
-  /** ng-template custom para el contenido de la card. */
+
+  /**
+   * Template personalizado para el contenido de la card.
+   * - Se invoca con el nodo como `$implicit`.
+   * - Si no se asigna, se usa el template por defecto (título + preview).
+   */
   cardTemplate = input<TemplateRef<any> | null>(null);
-  /** Opciones efectivas (colors/layout/dataview). */
+
+  /**
+   * Opciones efectivas de render (colors/layout/dataview), ya mergeadas.
+   * @default DEFAULT_OPTIONS
+   */
   options = input<SchemaOptions>(DEFAULT_OPTIONS);
 
-  /** True si el nodo tiene hijos (para decidir si mostrar botón). */
+  /**
+   * Indica si el nodo posee hijos en el grafo completo.
+   * Controla la visibilidad del botón de colapso cuando `showCollapseControls` es true.
+   * @default false
+   */
   hasChildren = input<boolean>(false);
-  /** Control visual de la presencia del botón de colapso. */
+
+  /**
+   * Control visual de la presencia del botón de colapso.
+   * Normalmente lo controla el contenedor según `settings.dataView.enableCollapse`.
+   * @default false
+   */
   showCollapseControls = input<boolean>(false);
-  /** Estado visual del toggle (rotación del ícono). */
+
+  /**
+   * Estado visual del toggle (rota el ícono de la chevron).
+   * @default false
+   */
   isCollapsed = input<boolean>(false);
 
   // ===== Outputs =====
-  /** Emite cuando se hace click en la card (selección de nodo). */
+
+  /**
+   * Emite cuando se hace click en la card (selección del nodo actual).
+   */
   @Output() nodeClick = new EventEmitter<SchemaNode>();
-  /** Emite cuando se solicita colapsar/expandir este nodo. */
+
+  /**
+   * Emite cuando se solicita colapsar/expandir este nodo (click al botón overlay).
+   */
   @Output() toggleRequest = new EventEmitter<SchemaNode>();
 
-  /** True si el título por defecto debe mostrarse (titleMode !== 'none'). */
+  // ===== API interna (métodos de ayuda) =====
+
+  /**
+   * Indica si debe mostrarse el título del template por defecto.
+   * @returns `true` cuando `options.titleMode !== 'none'`.
+   */
   showTitle(): boolean {
     return (this.options().titleMode ?? 'auto') !== 'none';
   }
 
-  /** Emite nodeClick sin burbujas. */
+  /**
+   * Manejador de click sobre la card.
+   * - Detiene la propagación para no afectar el stage/pan.
+   * - Emite `nodeClick` con el nodo actual.
+   */
   onClick(event: MouseEvent) {
     event.stopPropagation();
     this.nodeClick.emit(this.node()!);
   }
 
-  /** Convierte objeto a pares [k,v] preservando el orden del template. */
+  /**
+   * Convierte un objeto plano en una lista de pares [clave, valor].
+   * @param obj Objeto a convertir.
+   * @returns Array de pares, preservando el orden enumerado.
+   */
   objToPairs(obj: Record<string, any>) {
     return Object.entries(obj);
   }
 
-  /** Emite toggleRequest sin burbujas. */
+  /**
+   * Manejador de click del botón de colapso/expansión overlay.
+   * - Detiene la propagación.
+   * - Emite `toggleRequest` con el nodo actual.
+   */
   onToggle(event: MouseEvent) {
     event.stopPropagation();
     this.toggleRequest.emit(this.node()!);
   }
 
-  /** Calcula clases de acento según accentByKey/showColor*/
+  /**
+   * Calcula clases CSS de acento según:
+   * - `options.accentByKey` y valor booleano/null en `node.data[k]`.
+   * - `options.accentFill` y `options.accentInverse`.
+   * - `options.showColorTrue/False/Null`.
+   *
+   * @returns Array de clases: `accent-true|false|null` y, si aplica, `accent-fill-*`.
+   */
   getAccentClasses(): string[] {
     const k = this.options().accentByKey;
     if (!k) return [];
@@ -314,7 +382,11 @@ export class SchemaCardComponent {
     }
   }
 
-  /** True si la clave indicada debe forzar no-wrap en el valor. */
+  /**
+   * Indica si una determinada clave debe representarse en **una sola línea** (nowrap).
+   * @param key Clave a evaluar.
+   * @returns `true` si `key` está incluida en `options.noWrapKeys`.
+   */
   isNoWrapKey(key: string): boolean {
     const list = this.options().noWrapKeys ?? [];
     return list.includes(key);

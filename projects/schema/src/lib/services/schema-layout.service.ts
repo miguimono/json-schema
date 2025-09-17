@@ -10,23 +10,38 @@ import {
 } from '../models';
 
 /**
- * Servicio de layout:
- * - Ejecuta ELK (layered) con dirección RIGHT/DOWN y ruteo ORTHOGONAL.
- * - Aplica flip-Y para facilitar el render en un sistema de coordenadas "pantalla".
- * - Reordena hermanos usando jsonMeta.childOrder y aplica gap dinámico legible.
- * - Alinea padre con hijos (firstChild/center).
- * - Reconstruye los puntos de aristas (orthogonal/line/curve) respetando thresholds.
- * - Soporta alineaciones opcionales: snapRootChildrenY / snapChainSegmentsY.
+ * Servicio responsable de calcular el layout del grafo y reconstruir
+ * los puntos de las aristas según el estilo configurado.
+ *
+ * ### Funciones clave
+ * - Ejecuta **ELK (layered)** con dirección RIGHT/DOWN y ruteo ORTHOGONAL.
+ * - Aplica **flip-Y** para usar coordenadas “pantalla” (y hacia abajo).
+ * - **Reordena hermanos** usando `jsonMeta.childOrder` y aplica **gap dinámico**.
+ * - **Alinea padre ↔ hijos** según `layoutAlign` ('firstChild' | 'center').
+ * - Reconstruye **puntos de aristas** para estilos `orthogonal | line | curve`,
+ *   respetando umbrales (`straightThresholdDx`) y `curveTension`.
+ * - Soporta alineaciones opcionales: `snapRootChildrenY` y `snapChainSegmentsY`.
  */
 @Injectable({ providedIn: 'root' })
 export class SchemaLayoutService {
+  /** Instancia interna de ELK para cálculos de layout. */
   private elk = new ELK();
 
   /**
-   * Calcula posiciones (x,y,width,height) de nodos y puntos de aristas.
-   * @param graph Grafo normalizado (nodos+aristas).
-   * @param opts Opciones parciales (mezcladas con {@link DEFAULT_OPTIONS}).
-   * @returns Grafo con posiciones y puntos de dibujo actualizados.
+   * Calcula posiciones (x, y, width, height) de nodos y puntos de aristas.
+   *
+   * @param graph Grafo normalizado de entrada (nodos + aristas).
+   * @param opts  Opciones parciales de layout (mezcladas con {@link DEFAULT_OPTIONS}).
+   * @returns     Promesa con grafo actualizado (posiciones + puntos de aristas).
+   *
+   * ### Pipeline
+   * 1) Construye el grafo ELK (children/edges + layoutOptions).
+   * 2) Ejecuta `elk.layout`.
+   * 3) Calcula **flip-Y** y asigna posiciones a nodos.
+   * 4) Aplica alineaciones opcionales (`snapRootChildrenY`, `snapChainSegmentsY`).
+   * 5) Reordena hermanos por `childOrder` y calcula **gap** en función de ramificación.
+   * 6) Alinea padre ↔ hijos con `layoutAlign`.
+   * 7) Reconstruye puntos de aristas según `linkStyle` y parámetros.
    */
   async layout(
     graph: NormalizedGraph,
@@ -80,7 +95,7 @@ export class SchemaLayoutService {
     const maxY = allYs.length ? Math.max(...allYs) : 0;
     const flipY = (y: number) => maxY - y + minY;
 
-    // 4) Mapear posiciones de nodos
+    // 4) Mapear posiciones de nodos desde ELK → grafo (aplicando flipY)
     const mapNodes = new Map(graph.nodes.map((n) => [n.id, n]));
     res['children']?.forEach((c: any) => {
       const node = mapNodes.get(c.id);
@@ -91,7 +106,7 @@ export class SchemaLayoutService {
       node.height = c.height ?? node.height;
     });
 
-    // 5) Alineaciones opcionales
+    // 5) Alineaciones opcionales de nodos ya posicionados
     if (options.snapRootChildrenY) {
       const rootId = graph.nodes[0]?.id;
       if (rootId) {
@@ -149,7 +164,7 @@ export class SchemaLayoutService {
       );
     }
 
-    // ⭐ pinY (si se pasó en meta)
+    // ⭐ pinY (si se pasó en meta): fija verticalmente un hijo "ancla"
     const pinY: Record<string, number> =
       (graph.meta?.['pinY'] as Record<string, number> | undefined) ?? {};
 
@@ -194,6 +209,7 @@ export class SchemaLayoutService {
           cursorDown += (n.height ?? 0) + gap;
         }
       } else {
+        // Centra el bloque de hijos alrededor de su centroide vertical
         const avgCy =
           childs.reduce(
             (acc, n) => acc + ((n.y ?? 0) + (n.height ?? 0) / 2),
@@ -210,7 +226,7 @@ export class SchemaLayoutService {
       }
     }
 
-    // (2) Alineación padre ↔ hijos
+    // (2) Alineación padre ↔ hijos (firstChild/center)
     const alignMode = options.layoutAlign ?? 'center';
     for (const [parentId, childs] of childrenByParent.entries()) {
       if (!childs || childs.length === 0) continue;
@@ -238,7 +254,7 @@ export class SchemaLayoutService {
       parent.y = Math.round(targetCy - (parent.height ?? 0) / 2);
     }
 
-    // (3) Recalcular puntos de aristas en función del estilo
+    // (3) Recalcular puntos de aristas en función del estilo y thresholds
     const mapEdges = new Map(graph.edges.map((e) => [e.id, e]));
     for (const e of graph.edges) {
       const src = mapNodes.get(e.source);
@@ -248,6 +264,7 @@ export class SchemaLayoutService {
         if (me) me.points = [];
         continue;
       }
+      // Puntos de anclaje en el borde derecho del origen y borde izquierdo del destino
       const start = {
         x: (src.x ?? 0) + (src.width ?? 0),
         y: (src.y ?? 0) + (src.height ?? 0) / 2,
@@ -257,6 +274,7 @@ export class SchemaLayoutService {
         y: (tgt.y ?? 0) + (tgt.height ?? 0) / 2,
       };
 
+      // Estilo orthogonal: M-L-L-L (L con codo medio)
       if ((options.linkStyle ?? 'orthogonal') === 'orthogonal') {
         const midX = Math.round((start.x + end.x) / 2);
         e.points = [
@@ -266,8 +284,10 @@ export class SchemaLayoutService {
           { x: end.x, y: end.y },
         ];
       } else if (options.linkStyle === 'line') {
+        // Línea recta
         e.points = [start, end];
       } else {
+        // Curva cúbica con control lateral; recta si dx < straightThresholdDx
         const dxAbs = Math.abs(end.x - start.x);
         if (dxAbs < (options.straightThresholdDx ?? 160)) {
           e.points = [start, end];
@@ -279,6 +299,7 @@ export class SchemaLayoutService {
             c1y = start.y;
           let c2x = end.x - dir * t,
             c2y = end.y;
+          // Si casi horizontal, agrega una ligera “panza” para mejor lectura
           if (Math.abs(dy) < 1) {
             const bow = Math.max(8, Math.min(96, t * 0.5));
             c1y = start.y - bow;
@@ -289,6 +310,7 @@ export class SchemaLayoutService {
       }
     }
 
+    // Devuelve grafo con posiciones/puntos actualizados, preservando meta
     return { nodes: graph.nodes, edges: graph.edges, meta: graph.meta };
   }
 }

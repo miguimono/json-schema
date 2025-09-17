@@ -1,3 +1,5 @@
+// projects/schema/src/lib/components/schema-links.component.ts
+
 import {
   ChangeDetectionStrategy,
   Component,
@@ -8,6 +10,25 @@ import {
 } from '@angular/core';
 import { SchemaEdge, SchemaOptions, DEFAULT_OPTIONS } from '../models';
 
+/**
+ * Componente responsable de renderizar **todas las aristas** (links) del grafo en un único SVG.
+ *
+ * ### Responsabilidades
+ * - Dibuja paths SVG a partir de `SchemaEdge.points` calculados por el layout.
+ * - Aplica estilos (color/grosor) según opciones (`SchemaOptions.linkStroke`, `linkStrokeWidth`).
+ * - Gestiona el **click** sobre una arista y lo expone vía el `Output` `linkClick`.
+ *
+ * ### Notas de renderizado
+ * - El `<svg>` está en **posición absoluta** y cubre el **escenario virtual** (width/height).
+ * - Las aristas se renderizan **debajo de las cards** (z-index: 0). Las cards tienen z-index > 0.
+ * - El atributo `d` de cada `<path>` lo genera {@link pathFor} en base a:
+ *   - `linkStyle` = `orthogonal | curve | line`
+ *   - Umbral `straightThresholdDx` y `curveTension` para curvas.
+ *
+ * ### Performance
+ * - `ChangeDetectionStrategy.OnPush`.
+ * - Uso de `@for (track e.id)` para minimizar diffs en DOM.
+ */
 @Component({
   selector: 'schema-links',
   standalone: true,
@@ -44,17 +65,61 @@ import { SchemaEdge, SchemaOptions, DEFAULT_OPTIONS } from '../models';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SchemaLinksComponent {
-  // Entradas
+  // ===== Entradas (signals + @Input) =====
+
+  /**
+   * Lista de aristas a dibujar. Deben traer sus `points` ya calculados por el layout.
+   * @required
+   */
   edges = input.required<SchemaEdge[]>();
+
+  /**
+   * Opciones efectivas para estilo de links y thresholds de curva.
+   * - `linkStroke`, `linkStrokeWidth`
+   * - `linkStyle`, `curveTension`, `straightThresholdDx`
+   * @default DEFAULT_OPTIONS
+   */
   options = input<SchemaOptions>(DEFAULT_OPTIONS);
 
+  /**
+   * Ancho del lienzo virtual en el que se proyectan las aristas.
+   * @default 4000
+   * @remarks Debe ser coherente con el "stage" del contenedor.
+   */
   @Input() width = 4000;
+
+  /**
+   * Alto del lienzo virtual en el que se proyectan las aristas.
+   * @default 2000
+   * @remarks Debe ser coherente con el "stage" del contenedor.
+   */
   @Input() height = 2000;
 
-  // Salidas
+  // ===== Salidas =====
+
+  /**
+   * Evento emitido al hacer click sobre una arista.
+   * @event
+   */
   @Output() linkClick = new EventEmitter<SchemaEdge>();
 
-  /** Construye el atributo `d` del path según estilo y puntos pre-calculados. */
+  // ===== API interna =====
+
+  /**
+   * Construye el atributo `d` del `<path>` SVG para una arista.
+   *
+   * @param e Arista con `points` pre-calculados (start/bends/end).
+   * @returns Cadena `d` de SVG. Si no hay puntos, retorna `''`.
+   *
+   * ### Reglas
+   * - **curve**:
+   *    - Si `dx < straightThresholdDx` → línea recta (evita curvas “raras” en distancias cortas).
+   *    - Si no, curva cúbica con controles laterales separados por `curveTension`.
+   *    - Si es casi horizontal (`|dy| < 1`) añade una ligera “panza” vertical para legibilidad.
+   * - **line**: `M a.x,a.y L b.x,b.y`
+   * - **orthogonal**: segmentos L con codo intermedio:
+   *    `M start  L midX,startY  L midX,endY  L end`
+   */
   pathFor(e: SchemaEdge): string {
     const pts = e.points ?? [];
     const {
@@ -94,6 +159,7 @@ export class SchemaLinksComponent {
       return `M ${a.x},${a.y} L ${b.x},${b.y}`;
     }
 
+    // 'orthogonal' (por defecto) o fallback:
     if (pts.length === 1) return `M ${pts[0].x},${pts[0].y}`;
     const [first, ...rest] = pts;
     return `M ${first.x},${first.y} ${rest
@@ -101,6 +167,11 @@ export class SchemaLinksComponent {
       .join(' ')}`;
   }
 
+  /**
+   * Click handler para una arista.
+   * - Detiene la propagación para no interferir con eventos del stage.
+   * - Emite `linkClick` con la arista clicada.
+   */
   onLinkClick(e: SchemaEdge, ev: MouseEvent) {
     ev.stopPropagation();
     this.linkClick.emit(e);

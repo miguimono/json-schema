@@ -46,6 +46,38 @@ import { CommonModule, NgFor, NgIf } from '@angular/common';
 import { SchemaCardComponent } from './schema-card.component';
 import { SchemaLinksComponent } from './schema-links.component';
 
+/**
+ * Orquestador principal del render del grafo a partir de un JSON arbitrario.
+ *
+ * ### Responsabilidades
+ * - Normaliza el JSON → grafo con {@link JsonAdapterService}.
+ * - Calcula posiciones y puntos de aristas con {@link SchemaLayoutService}.
+ * - Renderiza **cards** (`SchemaCardComponent`) y **links** (`SchemaLinksComponent`).
+ * - Gestiona **pan/zoom**, auto-resize de cards y encuadre del grafo.
+ * - Opcional: **colapso/expansión por card** cuando `settings.dataView.enableCollapse = true`.
+ *   - Al colapsar un nodo, se ocultan sus **descendientes** (no el propio nodo).
+ *   - La visibilidad depende de que **ningún ancestro** esté colapsado.
+ *
+ * ### Entradas principales
+ * - `data`: JSON de origen (requerido).
+ * - `settings`: {@link SchemaSettings} para configurar apariencia y comportamiento.
+ * - `options`: {@link SchemaOptions} (back-compat; se fusiona con `settings` y `DEFAULT_OPTIONS`).
+ * - `cardTemplate`: Template personalizado para el contenido de la card.
+ *
+ * ### Salidas
+ * - `nodeClick(SchemaNode)`: click en una card.
+ * - `linkClick(SchemaEdge)`: click en una arista.
+ *
+ * ### Estados/Overlays
+ * - `isLoading / isError` (o `settings.messages.isLoading / isError`) controlan overlays.
+ * - Mensajes personalizables: `emptyMessage`, `loadingMessage`, `errorMessage`.
+ *
+ * ### Viewport / Interacción
+ * - Pan con mouse drag en el stage.
+ * - Zoom con rueda del mouse (centrado bajo el cursor).
+ * - Doble click: **centra el nodo raíz** en el viewport.
+ * - Toolbar opcional: zoom+/zoom−/centrar y selectores de estilo de link y alineación.
+ */
 @Component({
   selector: 'schema',
   standalone: true,
@@ -277,86 +309,168 @@ import { SchemaLinksComponent } from './schema-links.component';
 })
 export class SchemaComponent implements AfterViewInit, OnChanges {
   // ===== Inputs mínimos =====
+
+  /**
+   * JSON de entrada a visualizar. Puede ser cualquier estructura válida.
+   * @required
+   */
   data = input<any>(); // único obligatorio
 
-  /** Settings organizados por secciones (recomendado). */
+  /**
+   * Settings organizados por secciones (recomendado).
+   * Se fusionan internamente para producir `effectiveOptions`.
+   */
   settings = input<SchemaSettings | null>(null);
 
-  /** Back-compat: opciones planas de antes (opcional). */
+  /**
+   * Back-compat: opciones planas (anteriores a settings).
+   * Se fusionan con `DEFAULT_OPTIONS` y `settings`.
+   */
   options = input<SchemaOptions>(DEFAULT_OPTIONS);
 
-  /** Template de card custom (opcional). */
+  /**
+   * Template de card custom (opcional). Recibe el nodo como `$implicit`.
+   */
   cardTemplate = input<TemplateRef<any> | null>(null);
 
   // Mensajes/estados (pueden venir por settings.messages también)
+
+  /** Indica estado de carga (overlay). */
   isLoading = input<boolean>(false);
+  /** Indica estado de error (overlay). */
   isError = input<boolean>(false);
+  /** Mensaje de estado vacío. */
   emptyMessage = input<string>('No hay datos para mostrar');
+  /** Mensaje de carga. */
   loadingMessage = input<string>('Cargando…');
+  /** Mensaje de error. */
   errorMessage = input<string>('Error al cargar el esquema');
 
   // Viewport (pueden venir por settings.viewport)
+
+  /** Altura del viewport del esquema. */
   viewportHeight = signal<number>(800);
+  /** Altura mínima del viewport. */
   minViewportHeight = signal<number>(480);
+  /** Muestra/oculta toolbar integrada. */
   showToolbar = signal<boolean>(true);
 
   // ===== Outputs =====
+
+  /**
+   * Emitido cuando el usuario hace click en una card (nodo).
+   */
   @Output() nodeClick = new EventEmitter<SchemaNode>();
+
+  /**
+   * Emitido cuando el usuario hace click en una arista.
+   */
   @Output() linkClick = new EventEmitter<SchemaEdge>();
 
   // ===== Estado: full graph y visible graph =====
+
+  /**
+   * Grafo **completo** normalizado (sin filtrado por colapsos).
+   */
   private fullGraph = signal<NormalizedGraph>({ nodes: [], edges: [] });
+
+  /**
+   * Grafo **visible** (filtrado por colapsos si aplica).
+   */
   private graph = signal<NormalizedGraph>({ nodes: [], edges: [] });
+
+  /** Nodos visibles (memoizado). */
   nodes = computed(() => this.graph().nodes);
+  /** Aristas visibles (memoizado). */
   edges = computed(() => this.graph().edges);
 
+  /** Referencia al elemento raíz para medir viewport y stage. */
   @ViewChild('root', { static: true }) rootRef!: ElementRef<HTMLElement>;
 
   // ===== Pan/zoom =====
+
+  /** Escala actual (zoom). */
   private scale = signal(1);
+  /** Escala mínima permitida (ajustada por fitToView). */
   private minScale = signal(0.2);
+  /** Escala máxima permitida. */
   private maxScale = signal(3);
+  /** Traslación X del stage. */
   private tx = signal(0);
+  /** Traslación Y del stage. */
   private ty = signal(0);
+
+  /** Transform CSS aplicada al stage. */
   transform = computed(
     () => `translate(${this.tx()}px, ${this.ty()}px) scale(${this.scale()})`
   );
 
+  /** Tamaño virtual del canvas (coherente con SchemaLinks). */
   virtualWidth = 12000;
+  /** Tamaño virtual del canvas (coherente con SchemaLinks). */
   virtualHeight = 6000;
 
+  /** Flag de arrastre en curso. */
   private dragging = false;
+  /** Última posición X del mouse durante drag. */
   private lastX = 0;
+  /** Última posición Y del mouse durante drag. */
   private lastY = 0;
 
   // Controles de toolbar (valores actuales)
+
+  /** Estilo de link actual para el selector de toolbar. */
   opt_linkStyle = signal<'orthogonal' | 'curve' | 'line'>('orthogonal');
+  /** Alineación padre ↔ hijos actual para el selector de toolbar. */
   opt_layoutAlign = signal<'firstChild' | 'center'>('center');
 
   // ======= Derivados (no escribimos sobre inputs) =======
+
+  /** Vista: estado de carga (prioriza settings.messages.isLoading). */
   isLoadingView = computed(
     () => this.settings()?.messages?.isLoading ?? this.isLoading()
   );
+  /** Vista: estado de error (prioriza settings.messages.isError). */
   isErrorView = computed(
     () => this.settings()?.messages?.isError ?? this.isError()
   );
+  /** Vista: mensaje vacío (prioriza settings.messages.emptyMessage). */
   emptyMessageView = computed(
     () => this.settings()?.messages?.emptyMessage ?? this.emptyMessage()
   );
+  /** Vista: mensaje de carga (prioriza settings.messages.loadingMessage). */
   loadingMessageView = computed(
     () => this.settings()?.messages?.loadingMessage ?? this.loadingMessage()
   );
+  /** Vista: mensaje de error (prioriza settings.messages.errorMessage). */
   errorMessageView = computed(
     () => this.settings()?.messages?.errorMessage ?? this.errorMessage()
   );
 
   // ===== Colapso/expansión =====
-  /** Índices de hijos/padres para evaluar descendencia/ancestros. */
+
+  /**
+   * Índices hijos por id (sobre el **grafo completo**).
+   * @example childrenById.get(parentId) => string[] de ids hijos
+   */
   private childrenById = new Map<string, string[]>();
+
+  /**
+   * Índices padres por id (sobre el **grafo completo**).
+   * @example parentsById.get(childId) => string[] de ids padres
+   */
   private parentsById = new Map<string, string[]>();
-  /** Conjunto de nodos colapsados (se ocultan sus DESCENDIENTES). */
+
+  /**
+   * Conjunto de ids de nodos **colapsados**.
+   * - Un nodo colapsado **oculta sus descendientes** en el subgrafo visible.
+   */
   private collapsed = new Set<string>();
-  /** Flag derivado de settings.dataView.enableCollapse. */
+
+  /**
+   * Flag derivado: si está habilitado el colapso por card.
+   * (proxy de `settings.dataView.enableCollapse`)
+   */
   enableCollapse = computed<boolean>(
     () => !!this.settings()?.dataView?.enableCollapse
   );
@@ -367,6 +481,11 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
   ) {}
 
   // ===== Merge de settings → options + UI =====
+
+  /**
+   * Recalcula parámetros de viewport y sincroniza controles de toolbar
+   * en base a `settings` y a las opciones efectivas.
+   */
   private recomputeEffectiveSettings(): void {
     const s = this.settings() ?? {};
     // viewport únicamente (no tocamos inputs de mensajes)
@@ -385,7 +504,11 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     this.opt_layoutAlign.set(base.layoutAlign ?? 'center');
   }
 
-  /** Combina DEFAULT_OPTIONS + options (back-compat) + settings.{colors,layout,dataView,debug} */
+  /**
+   * Opciones efectivas resultantes del merge:
+   * - `DEFAULT_OPTIONS` + `options()` + `settings.colors/layout/dataView/debug`
+   * - Además respeta selectores de toolbar (linkStyle/layoutAlign).
+   */
   effectiveOptions = computed<SchemaOptions>(() => {
     const flat = this.options() ?? DEFAULT_OPTIONS;
     const s = this.settings() ?? {};
@@ -523,16 +646,24 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
   });
 
   // ===== Ciclo de vida =====
+
+  /** Inicializa settings efectivos y dispara el pipeline de cómputo. */
   ngAfterViewInit(): void {
     this.recomputeEffectiveSettings();
     this.compute();
   }
+
+  /** Reacciona a cambios en inputs para recomputar settings y grafo. */
   ngOnChanges(_: SimpleChanges): void {
     this.recomputeEffectiveSettings();
     this.compute();
   }
 
   // ===== Internos =====
+
+  /**
+   * Clona un grafo (nodos/aristas/meta) para evitar mutaciones por referencia.
+   */
   private cloneGraph(g: NormalizedGraph): NormalizedGraph {
     return {
       nodes: g.nodes.map((n) => ({ ...n })),
@@ -540,12 +671,18 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
       meta: { ...(g.meta ?? {}) },
     };
   }
+
+  /**
+   * Espera al próximo frame de animación (requestAnimationFrame).
+   */
   private nextFrame(): Promise<void> {
     return new Promise((resolve) => requestAnimationFrame(() => resolve()));
   }
 
   /**
-   * Reconstruye índices hijos/padres sobre el grafo completo.
+   * Reconstruye índices hijos/padres sobre el grafo completo para soportar colapso.
+   * - `childrenById`: parentId → [childId...]
+   * - `parentsById`:  childId → [parentId...]
    */
   private buildIndices(): void {
     this.childrenById.clear();
@@ -562,8 +699,8 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
   }
 
   /**
-   * Determina si un nodo es visible en función de colapsos:
-   * Es visible si NINGUNO de sus ancestros está en `collapsed`.
+   * Determina si un nodo es visible según colapsos:
+   * - Es visible si **ningún ancestro** está en `collapsed`.
    */
   private isVisibleNodeByCollapsedAncestors(id: string): boolean {
     if (!this.enableCollapse()) return true; // sin colapso, todo visible
@@ -581,8 +718,8 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
   }
 
   /**
-   * Construye el subgrafo visible según los ancestros colapsados.
-   * Si enableCollapse=false, retorna el grafo completo.
+   * Construye el **subgrafo visible** filtrado por colapsos.
+   * - Si `enableCollapse=false`, retorna el grafo completo.
    */
   private buildVisibleGraphFromCollapsed(): NormalizedGraph {
     const full = this.fullGraph();
@@ -602,13 +739,14 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
 
   // ===== Toggle de colapso con anclaje de posición =====
 
-  // onCardToggle(n)
-  // - Captura la posición de pantalla del nodo (para anclar).
-  // - Alterna colapso.
-  // - Calcula el layout final del subgrafo visible.
-  // - Anima desde el estado actual → estado final (interpolación de nodos y aristas)
-  //   manteniendo el nodo clicado en el MISMO lugar de pantalla.
-
+  /**
+   * Alterna colapso/expansión de un nodo:
+   * - Ancla temporalmente la posición de pantalla del nodo clicado.
+   * - Recalcula el subgrafo visible y su layout (con medición si está activa).
+   * - **Anima** desde el estado actual al estado final manteniendo el anclaje.
+   *
+   * @param n Nodo objetivo del toggle.
+   */
   async onCardToggle(n: SchemaNode): Promise<void> {
     if (!this.enableCollapse() || !n?.id) return;
 
@@ -642,14 +780,32 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     await this.animateToGraph(laid, 260, n.id, anchorBefore);
   }
 
-  /** Indica si un nodo tiene hijos en el grafo completo. */
+  /**
+   * Indica si un nodo tiene hijos en el grafo completo (no filtrado).
+   * @param id Id del nodo a consultar.
+   */
   hasChildren = (id: string): boolean =>
     (this.childrenById.get(id)?.length ?? 0) > 0;
 
-  /** Indica si un nodo está marcado como colapsado. */
+  /**
+   * Indica si un nodo está actualmente marcado como **colapsado**.
+   * @param id Id del nodo.
+   */
   isNodeCollapsed = (id: string): boolean => this.collapsed.has(id);
 
   // ===== Pipeline principal =====
+
+  /**
+   * Pipeline principal de render:
+   * 1) Normaliza el JSON → grafo completo.
+   * 2) Construye índices hijos/padres.
+   * 3) Limpia colapsados si `enableCollapse=false`.
+   * 4) Construye subgrafo visible (filtrado si aplica).
+   * 5) Ejecuta layout inicial y pinta.
+   * 6) Si `autoResizeCards=true`, mide DOM y hace relayout hasta estabilizar.
+   * 7) Encuadra el grafo al viewport (fit-to-view).
+   * 8) (Opcional) expone `schemaDebug` si `debug.exposeOnWindow=true`.
+   */
   private async compute(): Promise<void> {
     if (this.isLoadingView()) return;
 
@@ -704,10 +860,11 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     }
   }
 
-  // relayoutVisible(anchorId?, anchorScreen?)
-  // Recalcula layout del subgrafo visible y ANIMA hacia él.
-  // Si se pasan anchorId + anchorScreen, mantiene anclado ese nodo.
-
+  /**
+   * Recalcula layout del **subgrafo visible** y **anima** hacia él.
+   * @param anchorId (Opcional) Id de nodo a **anclar** en pantalla.
+   * @param anchorScreen (Opcional) Posición de pantalla objetivo a mantener durante la animación.
+   */
   private async relayoutVisible(
     anchorId?: string,
     anchorScreen?: { x: number; y: number }
@@ -731,7 +888,12 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     await this.animateToGraph(laid, 260, anchorId, anchorScreen);
   }
 
-  /** Mide .schema-card y aplica width/height con colchón extra. */
+  /**
+   * Mide dimensiones reales de `.schema-card` en DOM y las copia a los nodos visibles.
+   * @param _pass Número de pasada (informativo para logging).
+   * @param _log Si `true`, habilita algunos logs de medición.
+   * @returns `true` si hubo cambios en width/height de algún nodo (requiere relayout).
+   */
   private measureAndApply(_pass: number, _log = false): boolean {
     const opts = this.effectiveOptions();
     const extraW = opts.measureExtraWidthPx ?? 0;
@@ -768,11 +930,19 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
   }
 
   // ===== Viewport / encuadre =====
+
+  /**
+   * Devuelve tamaño actual del viewport (cliente) del componente.
+   */
   private getViewportSize() {
     const el = this.rootRef.nativeElement;
     const rect = el.getBoundingClientRect();
     return { w: rect.width, h: rect.height };
   }
+
+  /**
+   * Calcula bounds (minX/minY/maxX/maxY) del grafo visible.
+   */
   private getGraphBounds() {
     const ns = this.nodes();
     if (!ns.length) return { minX: 0, minY: 0, maxX: 1, maxY: 1 };
@@ -788,6 +958,12 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     }
     return { minX, minY, maxX, maxY };
   }
+
+  /**
+   * Ajusta zoom y traslación para **encuadrar** el grafo visible dentro del viewport.
+   * - Define `minScale` para no permitir hacer zoom-out más allá del encuadre.
+   * - Posiciona el **nodo raíz** cerca del padding superior/izquierdo.
+   */
   private fitToView() {
     const { w, h } = this.getViewportSize();
     const { minX, minY, maxX, maxY } = this.getGraphBounds();
@@ -812,6 +988,11 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
   }
 
   // ===== Interacción (zoom/pan/centrado) =====
+
+  /**
+   * Zoom con rueda del mouse, centrado bajo el cursor.
+   * @param e WheelEvent del navegador.
+   */
   onWheel(e: WheelEvent) {
     e.preventDefault();
     const rect = this.rootRef.nativeElement.getBoundingClientRect();
@@ -831,6 +1012,10 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     this.ty.set(mouseY - worldY * newScale);
     this.scale.set(newScale);
   }
+
+  /**
+   * Inicia arrastre para pan del stage (excepto si se clickea el botón de colapso).
+   */
   onPointerDown(e: MouseEvent) {
     this.dragging = true;
     const el = e.target as HTMLElement;
@@ -842,6 +1027,10 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     this.lastX = e.clientX;
     this.lastY = e.clientY;
   }
+
+  /**
+   * Continúa arrastre para pan del stage.
+   */
   onPointerMove(e: MouseEvent) {
     if (!this.dragging) return;
     const dx = e.clientX - this.lastX;
@@ -851,15 +1040,17 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     this.lastX = e.clientX;
     this.lastY = e.clientY;
   }
+
+  /**
+   * Finaliza arrastre (mouse up o mouse leave).
+   */
   onPointerUp() {
     this.dragging = false;
   }
 
-  // Centra el nodo raíz exactamente en el centro del viewport
-  // (antes quedaba cerca de la esquina superior-izquierda).
-
-  // onDblClick(): centra el nodo raíz en el centro del viewport.
-
+  /**
+   * Doble click: centra el **nodo raíz** en el **centro** del viewport actual.
+   */
   onDblClick() {
     const root = this.nodes()[0];
     if (!root) return;
@@ -875,16 +1066,23 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     this.ty.set(viewportCy - nodeCy * s);
   }
 
+  /** Zoom-in (toolbar). */
   zoomIn() {
     this.applyZoom(1.15);
   }
+  /** Zoom-out (toolbar). */
   zoomOut() {
     this.applyZoom(1 / 1.15);
   }
+  /** Re-encuadra el grafo al viewport (toolbar). */
   resetView() {
     this.fitToView();
   }
 
+  /**
+   * Aplica un factor de zoom relativo, manteniendo el centro del viewport.
+   * @param factor Factor multiplicativo (>1 acerca, <1 aleja).
+   */
   private applyZoom(factor: number) {
     const rect = this.rootRef.nativeElement.getBoundingClientRect();
     const mouseX = rect.width / 2;
@@ -904,25 +1102,40 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
   }
 
   // Toolbar: selectores
+
+  /**
+   * Establece el estilo de enlace actual (selector de toolbar) y relayout.
+   * @param v 'orthogonal' | 'curve' | 'line'
+   */
   setLinkStyle(v: string) {
     const ok = v === 'orthogonal' || v === 'curve' || v === 'line';
     this.opt_linkStyle.set(ok ? (v as any) : 'orthogonal');
     this.relayoutVisible();
   }
+
+  /**
+   * Establece la alineación padre ↔ hijos (selector de toolbar) y relayout.
+   * @param v 'firstChild' | 'center'
+   */
   setLayoutAlign(v: string) {
     const ok = v === 'firstChild' || v === 'center';
     this.opt_layoutAlign.set(ok ? (v as any) : 'center');
     this.relayoutVisible();
   }
+
   // ===== Helpers de anclaje de posición =====
 
-  // Helpers de anclaje/centros usados por onCardToggle/relayoutVisible.
-
+  /**
+   * Obtiene un nodo visible por id.
+   */
   private getNodeById(id: string | undefined): SchemaNode | undefined {
     if (!id) return undefined;
     return this.graph().nodes.find((n) => n.id === id);
   }
 
+  /**
+   * Calcula el centro de un nodo en **coordenadas de pantalla** (tras transform).
+   */
   private getNodeScreenCenter(n: SchemaNode): { x: number; y: number } {
     const s = this.scale();
     const cx = (n.x ?? 0) + (n.width ?? 0) / 2;
@@ -930,6 +1143,9 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     return { x: cx * s + this.tx(), y: cy * s + this.ty() };
   }
 
+  /**
+   * Ajusta `tx/ty` para que el `nodeId` quede con su centro en `targetScreen`.
+   */
   private applyAnchorAfterLayout(
     nodeId: string,
     targetScreen: { x: number; y: number }
@@ -942,13 +1158,18 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     this.tx.set(targetScreen.x - cx * s);
     this.ty.set(targetScreen.y - cy * s);
   }
-  // animateToGraph(target, durationMs, anchorId?, anchorScreen?)
-  // Interpola del grafo actual → target en 'durationMs' ms.
-  // - Nodos: x/y/width/height (si cambian por auto-resize).
-  // - Aristas: puntos (se alinean longitudes repitiendo último punto).
-  // - Si anchorId+anchorScreen: el nodo anclado permanece en la misma
-  //   coordenada de pantalla durante toda la animación.
 
+  /**
+   * **Anima** del grafo actual → `target` en `durationMs` ms.
+   * - Interpola NODOS (x/y/width/height).
+   * - Interpola ARISTAS (alineando longitud de listas de puntos).
+   * - Si `anchorId` + `anchorScreen`, mantiene ese nodo anclado en pantalla.
+   *
+   * @param target Grafo destino (con posiciones y puntos finales).
+   * @param durationMs Duración de la animación (ms).
+   * @param anchorId (Opcional) Id de nodo a anclar.
+   * @param anchorScreen (Opcional) Posición de pantalla para mantener anclada.
+   */
   private async animateToGraph(
     target: NormalizedGraph,
     durationMs = 260,
