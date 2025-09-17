@@ -1,20 +1,27 @@
-import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, input } from "@angular/core";
-import { SchemaEdge, SchemaOptions, DEFAULT_OPTIONS } from "../models";
+import {
+  ChangeDetectionStrategy,
+  Component,
+  EventEmitter,
+  Input,
+  Output,
+  input,
+} from '@angular/core';
+import { SchemaEdge, SchemaOptions, DEFAULT_OPTIONS } from '../models';
 
 @Component({
-  selector: "schema-links",
+  selector: 'schema-links',
   standalone: true,
   template: `
     <svg class="schema-links" [attr.width]="width" [attr.height]="height">
       <g>
         @for (e of edges(); track e.id) {
-          <path
-            [attr.d]="pathFor(e)"
-            [attr.stroke]="options().linkStroke ?? '#019df4'"
-            [attr.stroke-width]="options().linkStrokeWidth ?? 2"
-            fill="none"
-            (click)="onLinkClick(e, $event)"
-          ></path>
+        <path
+          [attr.d]="pathFor(e)"
+          [attr.stroke]="options().linkStroke ?? '#019df4'"
+          [attr.stroke-width]="options().linkStrokeWidth ?? 2"
+          fill="none"
+          (click)="onLinkClick(e, $event)"
+        ></path>
         }
       </g>
     </svg>
@@ -50,10 +57,14 @@ export class SchemaLinksComponent {
   /** Construye el atributo `d` del path según estilo y puntos pre-calculados. */
   pathFor(e: SchemaEdge): string {
     const pts = e.points ?? [];
-    const { linkStyle = "orthogonal", curveTension = 80, straightThresholdDx = 160 } = this.options();
-    if (pts.length === 0) return "";
+    const {
+      linkStyle = 'orthogonal',
+      curveTension = 80,
+      straightThresholdDx = 160,
+    } = this.options();
+    if (pts.length === 0) return '';
 
-    if (linkStyle === "curve") {
+    if (linkStyle === 'curve') {
       const a = pts[0],
         b = pts[pts.length - 1];
       const dxAbs = Math.abs(b.x - a.x);
@@ -77,7 +88,7 @@ export class SchemaLinksComponent {
       return `M ${a.x},${a.y} C ${c1x},${c1y} ${c2x},${c2y} ${b.x},${b.y}`;
     }
 
-    if (linkStyle === "line") {
+    if (linkStyle === 'line') {
       const a = pts[0],
         b = pts[pts.length - 1];
       return `M ${a.x},${a.y} L ${b.x},${b.y}`;
@@ -85,7 +96,9 @@ export class SchemaLinksComponent {
 
     if (pts.length === 1) return `M ${pts[0].x},${pts[0].y}`;
     const [first, ...rest] = pts;
-    return `M ${first.x},${first.y} ${rest.map((p) => `L ${p.x},${p.y}`).join(" ")}`;
+    return `M ${first.x},${first.y} ${rest
+      .map((p) => `L ${p.x},${p.y}`)
+      .join(' ')}`;
   }
 
   onLinkClick(e: SchemaEdge, ev: MouseEvent) {

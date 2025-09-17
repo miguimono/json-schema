@@ -1,3 +1,5 @@
+// projects/schema/src/lib/components/schema-card.component.ts
+
 import {
   ChangeDetectionStrategy,
   Component,
@@ -9,6 +11,28 @@ import {
 import { DEFAULT_OPTIONS, SchemaNode, SchemaOptions } from '../models';
 import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
 
+/**
+ * Componente visual para renderizar un {@link SchemaNode} como card.
+ *
+ * Características:
+ * - Muestra título (si titleMode !== 'none').
+ * - Vista previa de atributos (jsonMeta.attributes).
+ * - Badges de conteo de arrays no escalares (jsonMeta.arrayCounts).
+ * - Overlay de botón colapsar/expandir (si `showCollapseControls` y `hasChildren`).
+ * - Emite `nodeClick` y `toggleRequest` sin interferir con el template.
+ *
+ * Inputs:
+ * - node:           nodo que se renderiza (requerido)
+ * - cardTemplate:   ng-template opcional para customizar el contenido
+ * - options:        opciones (colors, layout, dataView)
+ * - hasChildren:    si el nodo tiene hijos en el grafo completo
+ * - showCollapseControls: muestra el botón si true
+ * - isCollapsed:    estado visual del toggle (rotación del icono)
+ *
+ * Outputs:
+ * - nodeClick(node): selección del nodo
+ * - toggleRequest(node): solicitud de colapso/expansión
+ */
 @Component({
   selector: 'schema-card',
   standalone: true,
@@ -26,8 +50,20 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
       [style.maxWidth.px]="options().maxCardWidth ?? null"
       [style.maxHeight.px]="options().maxCardHeight ?? null"
       (click)="onClick($event)"
-      style="z-index: 1;"
+      style="z-index: 1; position: absolute;"
     >
+      <!-- Botón superpuesto: no interfiere con el contenido -->
+      <button
+        *ngIf="showCollapseControls() && hasChildren()"
+        type="button"
+        class="collapse-btn"
+        [attr.aria-pressed]="isCollapsed()"
+        (click)="onToggle($event)"
+        title="{{ isCollapsed() ? 'Expandir' : 'Colapsar' }}"
+      >
+        <span class="chev" [class.collapsed]="isCollapsed()">▾</span>
+      </button>
+
       <ng-container
         *ngIf="cardTemplate(); else defaultTpl"
         [ngTemplateOutlet]="cardTemplate()"
@@ -76,7 +112,6 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
   styles: [
     `
       .schema-card {
-        position: absolute;
         border-radius: 12px;
         border: 1px solid rgba(0, 0, 0, 0.08);
         background: #fff;
@@ -86,11 +121,31 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
         word-break: normal;
         overflow-wrap: normal;
         overflow: hidden;
+        transition: left 160ms ease, top 160ms ease, opacity 120ms ease;
       }
-      .debug-outline {
-        outline: 2px dashed #ef4444;
+      .collapse-btn {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
+        border: 1px solid rgba(0, 0, 0, 0.12);
+        background: #f8fafc;
+        cursor: pointer;
+        display: grid;
+        place-items: center;
+        padding: 0;
+        line-height: 1;
+        z-index: 2;
       }
-
+      .chev {
+        display: inline-block;
+        transition: transform 160ms ease;
+      }
+      .chev.collapsed {
+        transform: rotate(180deg);
+      }
       .card-body {
         padding: 12px 20px;
       }
@@ -99,7 +154,6 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
         font-size: 14px;
         margin-bottom: 6px;
       }
-
       .card-preview {
         font-size: 12px;
         line-height: 1.28;
@@ -112,7 +166,6 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
         margin: 3px 0;
         padding-right: 8px;
       }
-
       .k {
         opacity: 0.66;
         font-weight: 600;
@@ -133,7 +186,6 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
         color: #dc2626;
         font-weight: 700;
       }
-
       .array-badges {
         margin-top: 6px;
         display: flex;
@@ -147,58 +199,81 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
         padding: 2px 6px;
         border-radius: 999px;
       }
-
       .nowrap {
         white-space: nowrap !important;
         word-break: keep-all !important;
         overflow-wrap: normal !important;
       }
-
-      /* Acentos por booleano */
       .schema-card.accent-true {
-        border-color: #16a34a; /* green-600 */
+        border-color: #16a34a;
         box-shadow: 0 2px 10px rgba(22, 163, 74, 0.15);
       }
       .schema-card.accent-false {
-        border-color: #dc2626; /* red-600 */
+        border-color: #dc2626;
         box-shadow: 0 2px 10px rgba(220, 38, 38, 0.15);
       }
       .schema-card.accent-null {
-        border-color: #f59e0b; /* amber-500 */
+        border-color: #f59e0b;
         box-shadow: 0 2px 10px rgba(245, 158, 11, 0.15);
       }
-
-      /* 🎨 Relleno opcional cuando accentFill=true */
       .schema-card.accent-fill-true {
-        background: rgba(22, 163, 74, 0.1); /* verde suave */
+        background: rgba(22, 163, 74, 0.1);
       }
       .schema-card.accent-fill-false {
-        background: rgba(220, 38, 38, 0.1); /* rojo suave */
+        background: rgba(220, 38, 38, 0.1);
       }
       .schema-card.accent-fill-null {
-        background: rgba(245, 158, 11, 0.1); /* naranja suave */
+        background: rgba(245, 158, 11, 0.1);
       }
     `,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SchemaCardComponent {
+  // ===== Inputs =====
+  /** Nodo que se va a renderizar. */
   node = input.required<SchemaNode>();
+  /** ng-template custom para el contenido de la card. */
   cardTemplate = input<TemplateRef<any> | null>(null);
+  /** Opciones efectivas (colors/layout/dataview). */
   options = input<SchemaOptions>(DEFAULT_OPTIONS);
 
-  @Output() nodeClick = new EventEmitter<SchemaNode>();
+  /** True si el nodo tiene hijos (para decidir si mostrar botón). */
+  hasChildren = input<boolean>(false);
+  /** Control visual de la presencia del botón de colapso. */
+  showCollapseControls = input<boolean>(false);
+  /** Estado visual del toggle (rotación del ícono). */
+  isCollapsed = input<boolean>(false);
 
+  // ===== Outputs =====
+  /** Emite cuando se hace click en la card (selección de nodo). */
+  @Output() nodeClick = new EventEmitter<SchemaNode>();
+  /** Emite cuando se solicita colapsar/expandir este nodo. */
+  @Output() toggleRequest = new EventEmitter<SchemaNode>();
+
+  /** True si el título por defecto debe mostrarse (titleMode !== 'none'). */
   showTitle(): boolean {
     return (this.options().titleMode ?? 'auto') !== 'none';
   }
+
+  /** Emite nodeClick sin burbujas. */
   onClick(event: MouseEvent) {
     event.stopPropagation();
     this.nodeClick.emit(this.node()!);
   }
+
+  /** Convierte objeto a pares [k,v] preservando el orden del template. */
   objToPairs(obj: Record<string, any>) {
     return Object.entries(obj);
   }
+
+  /** Emite toggleRequest sin burbujas. */
+  onToggle(event: MouseEvent) {
+    event.stopPropagation();
+    this.toggleRequest.emit(this.node()!);
+  }
+
+  /** Calcula clases de acento según accentByKey/showColor*/
   getAccentClasses(): string[] {
     const k = this.options().accentByKey;
     if (!k) return [];
@@ -238,6 +313,8 @@ export class SchemaCardComponent {
       return classes;
     }
   }
+
+  /** True si la clave indicada debe forzar no-wrap en el valor. */
   isNoWrapKey(key: string): boolean {
     const list = this.options().noWrapKeys ?? [];
     return list.includes(key);
