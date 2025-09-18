@@ -1,12 +1,18 @@
 // projects/schema/src/lib/services/json-adapter.service.ts
+// =======================================================
+// JsonAdapterService
+// Convierte un JSON arbitrario en un grafo normalizado (nodos + aristas),
+// utilizando SchemaSettings (sin SchemaOptions). Los valores por defecto
+// provienen de DEFAULT_SETTINGS y se combinan por sección (deep merge).
+// =======================================================
 
 import { Injectable } from '@angular/core';
 import {
-  DEFAULT_OPTIONS,
+  DEFAULT_SETTINGS,
   NormalizedGraph,
   SchemaEdge,
   SchemaNode,
-  SchemaOptions,
+  SchemaSettings,
 } from '../models';
 
 /**
@@ -25,11 +31,40 @@ export class JsonAdapterService {
    * Convierte un input JSON en {@link NormalizedGraph}.
    *
    * @param input JSON arbitrario de entrada.
-   * @param opts Opciones parciales para normalización (se mezclan con {@link DEFAULT_OPTIONS}).
+   * @param opts  Settings parciales (se combinan con {@link DEFAULT_SETTINGS} por sección).
    * @returns Grafo normalizado con nodos y aristas, incluyendo metadatos auxiliares.
    */
-  normalize(input: any, opts: Partial<SchemaOptions> = {}): NormalizedGraph {
-    const options: SchemaOptions = { ...DEFAULT_OPTIONS, ...opts };
+  normalize(input: any, opts: Partial<SchemaSettings> = {}): NormalizedGraph {
+    // ===== Merge por secciones (deep-merge ligero) =====
+    const settings: Required<SchemaSettings> = {
+      colors: { ...DEFAULT_SETTINGS.colors, ...(opts.colors ?? {}) },
+      layout: { ...DEFAULT_SETTINGS.layout, ...(opts.layout ?? {}) },
+      dataView: { ...DEFAULT_SETTINGS.dataView, ...(opts.dataView ?? {}) },
+      messages: { ...DEFAULT_SETTINGS.messages, ...(opts.messages ?? {}) },
+      viewport: { ...DEFAULT_SETTINGS.viewport, ...(opts.viewport ?? {}) },
+      debug: { ...DEFAULT_SETTINGS.debug, ...(opts.debug ?? {}) },
+    };
+
+    const dv = settings.dataView;
+
+    // ======== VALORES EFECTIVOS (sin undefined) ========
+    // Estas constantes resuelven los “posiblemente undefined” de TS.
+    const titleKeyPriority =
+      dv.titleKeyPriority ?? DEFAULT_SETTINGS.dataView.titleKeyPriority;
+    const hiddenKeysGlobal: string[] =
+      dv.hiddenKeysGlobal ?? DEFAULT_SETTINGS.dataView.hiddenKeysGlobal ?? [];
+    const treatScalarArraysAsAttribute =
+      dv.treatScalarArraysAsAttribute ??
+      DEFAULT_SETTINGS.dataView.treatScalarArraysAsAttribute;
+    const previewMaxKeys =
+      dv.previewMaxKeys ?? DEFAULT_SETTINGS.dataView.previewMaxKeys;
+    const collapseSingleChildWrappers =
+      dv.collapseSingleChildWrappers ??
+      DEFAULT_SETTINGS.dataView.collapseSingleChildWrappers;
+    const defaultNodeSize =
+      dv.defaultNodeSize ?? DEFAULT_SETTINGS.dataView.defaultNodeSize;
+    const maxDepth = dv.maxDepth ?? DEFAULT_SETTINGS.dataView.maxDepth;
+
     const nodes: SchemaNode[] = [];
     const edges: SchemaEdge[] = [];
 
@@ -78,7 +113,6 @@ export class JsonAdapterService {
      *
      * @param obj Objeto fuente.
      * @param usedKey Clave usada para el título (se omite en el preview).
-     * @param options Opciones activas de normalización.
      * @returns Objeto clave/valor con atributos de preview.
      *
      * Reglas:
@@ -89,23 +123,22 @@ export class JsonAdapterService {
      */
     const buildPreviewAttributes = (
       obj: any,
-      usedKey?: string,
-      options: SchemaOptions = DEFAULT_OPTIONS
+      usedKey?: string
     ): Record<string, any> => {
       const entries: [string, any][] = [];
       for (const [k, v] of Object.entries(obj ?? {})) {
-        if ((options.hiddenKeysGlobal ?? []).includes(k)) continue;
+        if (hiddenKeysGlobal.includes(k)) continue;
         if (usedKey && k === usedKey) continue;
         if (isScalar(v)) entries.push([k, v]);
         else if (
           Array.isArray(v) &&
-          options.treatScalarArraysAsAttribute &&
+          treatScalarArraysAsAttribute &&
           arrayIsScalar(v)
         ) {
           entries.push([k, v.join(', ')]);
         }
       }
-      return Object.fromEntries(entries.slice(0, options.previewMaxKeys));
+      return Object.fromEntries(entries.slice(0, previewMaxKeys));
     };
 
     /**
@@ -125,7 +158,7 @@ export class JsonAdapterService {
      * - Si está habilitado `collapseSingleChildWrappers`, se colapsa.
      */
     const isCollapsibleWrapper = (obj: any): boolean => {
-      if (!options.collapseSingleChildWrappers) return false;
+      if (!collapseSingleChildWrappers) return false;
       if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
       if (Object.values(obj).some(isScalar)) return false;
 
@@ -175,8 +208,8 @@ export class JsonAdapterService {
      * - Crea arista hacia el padre si corresponde.
      */
     const addNode = (jsonPath: string, obj: any, parentId?: string): string => {
-      const { title, usedKey } = pickTitle(obj, options.titleKeyPriority);
-      const attrs = buildPreviewAttributes(obj, usedKey, options);
+      const { title, usedKey } = pickTitle(obj, titleKeyPriority ?? []);
+      const attrs = buildPreviewAttributes(obj, usedKey);
 
       // Orden relativo respecto al padre
       let childOrder: number | undefined = undefined;
@@ -198,8 +231,8 @@ export class JsonAdapterService {
           arrayCounts: arrayCountsOf(obj),
           childOrder,
         },
-        width: options.defaultNodeSize?.width ?? 220,
-        height: options.defaultNodeSize?.height ?? 96,
+        width: defaultNodeSize?.width ?? 220,
+        height: defaultNodeSize?.height ?? 96,
       };
       nodes.push(node);
 
@@ -228,7 +261,9 @@ export class JsonAdapterService {
      * - Recorre hijos objetos/arrays no escalares.
      */
     const traverse = (val: any, path: string, parentId?: string, depth = 0) => {
-      if (options.maxDepth !== null && depth > options.maxDepth) return;
+      // Nota: maxDepth puede ser null → sin límite.
+      if (maxDepth !== undefined && maxDepth !== null && depth > maxDepth)
+        return;
 
       if (Array.isArray(val)) {
         val.forEach((c, i) =>
@@ -263,7 +298,7 @@ export class JsonAdapterService {
 
           if (Array.isArray(v)) {
             const scalarArr = v.length > 0 && v.every(isScalar);
-            if (scalarArr && options.treatScalarArraysAsAttribute) continue;
+            if (scalarArr && treatScalarArraysAsAttribute) continue;
             v.forEach((c, i) =>
               traverse(c, `${path}.${k}[${i}]`, myId, depth + 1)
             );

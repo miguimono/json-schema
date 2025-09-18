@@ -1,4 +1,10 @@
 // projects/schema/src/lib/components/schema-links.component.ts
+// ==========================================================
+// SchemaLinksComponent (sin SchemaOptions)
+// - Migrado a SchemaSettings + DEFAULT_SETTINGS.
+// - Aplana settings relevantes con un computed `view`.
+// - Mantiene API pública salvo el reemplazo de `options` → `settings`.
+// ==========================================================
 
 import {
   ChangeDetectionStrategy,
@@ -6,16 +12,17 @@ import {
   EventEmitter,
   Input,
   Output,
+  computed,
   input,
 } from '@angular/core';
-import { SchemaEdge, SchemaOptions, DEFAULT_OPTIONS } from '../models';
+import { SchemaEdge, SchemaSettings, DEFAULT_SETTINGS } from '../models';
 
 /**
  * Componente responsable de renderizar **todas las aristas** (links) del grafo en un único SVG.
  *
  * ### Responsabilidades
  * - Dibuja paths SVG a partir de `SchemaEdge.points` calculados por el layout.
- * - Aplica estilos (color/grosor) según opciones (`SchemaOptions.linkStroke`, `linkStrokeWidth`).
+ * - Aplica estilos (color/grosor) según `settings.colors` y forma/curvas según `settings.layout`.
  * - Gestiona el **click** sobre una arista y lo expone vía el `Output` `linkClick`.
  *
  * ### Notas de renderizado
@@ -38,8 +45,8 @@ import { SchemaEdge, SchemaOptions, DEFAULT_OPTIONS } from '../models';
         @for (e of edges(); track e.id) {
         <path
           [attr.d]="pathFor(e)"
-          [attr.stroke]="options().linkStroke ?? '#019df4'"
-          [attr.stroke-width]="options().linkStrokeWidth ?? 2"
+          [attr.stroke]="view().linkStroke"
+          [attr.stroke-width]="view().linkStrokeWidth"
           fill="none"
           (click)="onLinkClick(e, $event)"
         ></path>
@@ -74,12 +81,11 @@ export class SchemaLinksComponent {
   edges = input.required<SchemaEdge[]>();
 
   /**
-   * Opciones efectivas para estilo de links y thresholds de curva.
-   * - `linkStroke`, `linkStrokeWidth`
-   * - `linkStyle`, `curveTension`, `straightThresholdDx`
-   * @default DEFAULT_OPTIONS
+   * Settings efectivos (mergeados por el contenedor).
+   * Se usan `colors` (stroke, width) y `layout` (estilo y parámetros de curvas).
+   * @default DEFAULT_SETTINGS
    */
-  options = input<SchemaOptions>(DEFAULT_OPTIONS);
+  settings = input<SchemaSettings>(DEFAULT_SETTINGS);
 
   /**
    * Ancho del lienzo virtual en el que se proyectan las aristas.
@@ -103,6 +109,27 @@ export class SchemaLinksComponent {
    */
   @Output() linkClick = new EventEmitter<SchemaEdge>();
 
+  // ===== Vista aplanada para el template / path builder =====
+  /**
+   * `view`: computed con las propiedades planas que usa el SVG/path,
+   * derivadas de `settings`.
+   */
+  view = computed(() => {
+    const s = this.settings() ?? DEFAULT_SETTINGS;
+    return {
+      // colores
+      linkStroke: s.colors?.linkStroke ?? '#019df4',
+      linkStrokeWidth: s.colors?.linkStrokeWidth ?? 2,
+
+      // layout
+      linkStyle:
+        s.layout?.linkStyle ??
+        ('orthogonal' as 'orthogonal' | 'curve' | 'line'),
+      curveTension: s.layout?.curveTension ?? 80,
+      straightThresholdDx: s.layout?.straightThresholdDx ?? 160,
+    };
+  });
+
   // ===== API interna =====
 
   /**
@@ -122,16 +149,12 @@ export class SchemaLinksComponent {
    */
   pathFor(e: SchemaEdge): string {
     const pts = e.points ?? [];
-    const {
-      linkStyle = 'orthogonal',
-      curveTension = 80,
-      straightThresholdDx = 160,
-    } = this.options();
+    const { linkStyle, curveTension, straightThresholdDx } = this.view();
     if (pts.length === 0) return '';
 
     if (linkStyle === 'curve') {
-      const a = pts[0],
-        b = pts[pts.length - 1];
+      const a = pts[0];
+      const b = pts[pts.length - 1];
       const dxAbs = Math.abs(b.x - a.x);
       if (dxAbs < straightThresholdDx) return `M ${a.x},${a.y} L ${b.x},${b.y}`;
 
@@ -154,8 +177,8 @@ export class SchemaLinksComponent {
     }
 
     if (linkStyle === 'line') {
-      const a = pts[0],
-        b = pts[pts.length - 1];
+      const a = pts[0];
+      const b = pts[pts.length - 1];
       return `M ${a.x},${a.y} L ${b.x},${b.y}`;
     }
 

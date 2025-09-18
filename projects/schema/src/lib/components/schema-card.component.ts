@@ -1,4 +1,10 @@
 // projects/schema/src/lib/components/schema-card.component.ts
+// ==========================================================
+// SchemaCardComponent (sin SchemaOptions)
+// - Migrado a SchemaSettings + DEFAULT_SETTINGS.
+// - Aplana settings relevantes para la card con un computed `view`.
+// - Mantiene API pública (inputs/outputs) salvo el reemplazo de `options` → `settings`.
+// ==========================================================
 
 import {
   ChangeDetectionStrategy,
@@ -6,9 +12,10 @@ import {
   EventEmitter,
   Output,
   TemplateRef,
+  computed,
   input,
 } from '@angular/core';
-import { DEFAULT_OPTIONS, SchemaNode, SchemaOptions } from '../models';
+import { SchemaNode, SchemaSettings, DEFAULT_SETTINGS } from '../models';
 import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
 
 /**
@@ -18,8 +25,7 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
  * - Renderiza un nodo con **título** (si `titleMode !== 'none'`), **preview** de atributos
  *   (`jsonMeta.attributes`) y **badges** con conteos de arrays no escalares (`jsonMeta.arrayCounts`).
  * - Permite **template custom** vía `cardTemplate` (inserta el nodo como `$implicit`).
- * - Expone **acentos visuales** según `accentByKey` y flags (`accentFill`, `accentInverse`,
- *   `showColorTrue/False/Null`).
+ * - Expone **acentos visuales** según settings de `colors` y `dataView`.
  * - Muestra un **botón de colapso/expansión** overlay cuando:
  *     - `showCollapseControls === true` **y**
  *     - `hasChildren === true`.
@@ -29,7 +35,7 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
  * ### Inputs
  * - `node`: nodo actual a renderizar.
  * - `cardTemplate`: ng-template custom (opcional).
- * - `options`: opciones efectivas (mergeadas) de estilo/preview/layout.
+ * - `settings`: configuración por secciones (colors/layout/dataView/debug).
  * - `hasChildren`: indica si el nodo tiene hijos en el grafo completo (para mostrar el botón).
  * - `showCollapseControls`: fuerza la visibilidad del botón (controlado por el contenedor).
  * - `isCollapsed`: estado visual para rotar el ícono del botón.
@@ -51,15 +57,15 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
   template: `
     <div
       class="schema-card"
-      [class.debug-outline]="options().debug?.paintBounds"
+      [class.debug-outline]="view().debugPaintBounds"
       [attr.data-node-id]="node()?.id"
       [ngClass]="getAccentClasses()"
       [style.left.px]="node()?.x"
       [style.top.px]="node()?.y"
       [style.width.px]="node()?.width"
       [style.height.px]="node()?.height"
-      [style.maxWidth.px]="options().maxCardWidth ?? null"
-      [style.maxHeight.px]="options().maxCardHeight ?? null"
+      [style.maxWidth.px]="view().maxCardWidth"
+      [style.maxHeight.px]="view().maxCardHeight"
       (click)="onClick($event)"
       style="z-index: 1; position: absolute;"
     >
@@ -92,7 +98,7 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
             *ngIf="node()?.jsonMeta?.attributes as attrs"
           >
             <div *ngFor="let kv of objToPairs(attrs)" class="kv">
-              @if (kv[0] != this.options().accentByKey) {
+              @if (kv[0] != view().accentByKey) {
               <span class="k">{{ kv[0] }}:</span>
               <span
                 class="v"
@@ -258,10 +264,11 @@ export class SchemaCardComponent {
   cardTemplate = input<TemplateRef<any> | null>(null);
 
   /**
-   * Opciones efectivas de render (colors/layout/dataview), ya mergeadas.
-   * @default DEFAULT_OPTIONS
+   * Settings efectivos (mergeados por el contenedor).
+   * Se usan `colors`, `dataView` y `debug` para aplanar las opciones de la card.
+   * @default DEFAULT_SETTINGS
    */
-  options = input<SchemaOptions>(DEFAULT_OPTIONS);
+  settings = input<SchemaSettings>(DEFAULT_SETTINGS);
 
   /**
    * Indica si el nodo posee hijos en el grafo completo.
@@ -272,7 +279,7 @@ export class SchemaCardComponent {
 
   /**
    * Control visual de la presencia del botón de colapso.
-   * Normalmente lo controla el contenedor según `settings.dataView.enableCollapse`.
+   * Normalmente lo controla el contenedor según `dataView.enableCollapse`.
    * @default false
    */
   showCollapseControls = input<boolean>(false);
@@ -285,24 +292,44 @@ export class SchemaCardComponent {
 
   // ===== Outputs =====
 
-  /**
-   * Emite cuando se hace click en la card (selección del nodo actual).
-   */
+  /** Emite cuando se hace click en la card (selección del nodo actual). */
   @Output() nodeClick = new EventEmitter<SchemaNode>();
 
-  /**
-   * Emite cuando se solicita colapsar/expandir este nodo (click al botón overlay).
-   */
+  /** Emite cuando se solicita colapsar/expandir este nodo (click al botón overlay). */
   @Output() toggleRequest = new EventEmitter<SchemaNode>();
+
+  // ====== Vista aplanada para el template (evita repetir lookups) ======
+  /**
+   * `view`: computed con las propiedades planas que usa la card, derivadas de `settings`.
+   * Esto evita recalcular y ensuciar el template con múltiples accesos anidados.
+   */
+  view = computed(() => {
+    const s = this.settings() ?? DEFAULT_SETTINGS;
+    return {
+      // dataView
+      titleMode: s.dataView?.titleMode ?? 'auto',
+      maxCardWidth: s.dataView?.maxCardWidth ?? null,
+      maxCardHeight: s.dataView?.maxCardHeight ?? null,
+      noWrapKeys: s.dataView?.noWrapKeys ?? [],
+
+      // colors (acentos)
+      accentByKey: s.colors?.accentByKey ?? null,
+      accentFill: s.colors?.accentFill ?? false,
+      accentInverse: s.colors?.accentInverse ?? false,
+      showColorTrue: s.colors?.showColorTrue ?? false,
+      showColorFalse: s.colors?.showColorFalse ?? false,
+      showColorNull: s.colors?.showColorNull ?? false,
+
+      // debug
+      debugPaintBounds: s.debug?.paintBounds ?? false,
+    };
+  });
 
   // ===== API interna (métodos de ayuda) =====
 
-  /**
-   * Indica si debe mostrarse el título del template por defecto.
-   * @returns `true` cuando `options.titleMode !== 'none'`.
-   */
+  /** Indica si debe mostrarse el título del template por defecto. */
   showTitle(): boolean {
-    return (this.options().titleMode ?? 'auto') !== 'none';
+    return (this.view().titleMode ?? 'auto') !== 'none';
   }
 
   /**
@@ -336,47 +363,44 @@ export class SchemaCardComponent {
 
   /**
    * Calcula clases CSS de acento según:
-   * - `options.accentByKey` y valor booleano/null en `node.data[k]`.
-   * - `options.accentFill` y `options.accentInverse`.
-   * - `options.showColorTrue/False/Null`.
+   * - `view().accentByKey` y valor booleano/null en `node.data[k]`.
+   * - `view().accentFill` y `view().accentInverse`.
+   * - `view().showColorTrue/False/Null`.
    *
    * @returns Array de clases: `accent-true|false|null` y, si aplica, `accent-fill-*`.
    */
   getAccentClasses(): string[] {
-    const k = this.options().accentByKey;
-    if (!k) return [];
-    const v = this.node()?.data?.[k];
+    const {
+      accentByKey,
+      accentFill,
+      accentInverse,
+      showColorTrue,
+      showColorFalse,
+      showColorNull,
+    } = this.view();
+    if (!accentByKey) return [];
+
+    const v = this.node()?.data?.[accentByKey];
     const classes: string[] = [];
-    if (this.options().accentInverse) {
-      if (v === true && this.options().showColorTrue)
-        classes.push('accent-false');
-      if (v === false && this.options().showColorFalse)
-        classes.push('accent-true');
-      if (v === null && this.options().showColorNull)
-        classes.push('accent-null');
-      if (this.options().accentFill) {
-        if (v === true && this.options().showColorTrue)
-          classes.push('accent-fill-false');
-        if (v === false && this.options().showColorFalse)
-          classes.push('accent-fill-true');
-        if (v === null && this.options().showColorNull)
-          classes.push('accent-fill-null');
+
+    if (accentInverse) {
+      if (v === true && showColorTrue) classes.push('accent-false');
+      if (v === false && showColorFalse) classes.push('accent-true');
+      if (v === null && showColorNull) classes.push('accent-null');
+      if (accentFill) {
+        if (v === true && showColorTrue) classes.push('accent-fill-false');
+        if (v === false && showColorFalse) classes.push('accent-fill-true');
+        if (v === null && showColorNull) classes.push('accent-fill-null');
       }
       return classes;
     } else {
-      if (v === true && this.options().showColorTrue)
-        classes.push('accent-true');
-      if (v === false && this.options().showColorFalse)
-        classes.push('accent-false');
-      if (v === null && this.options().showColorNull)
-        classes.push('accent-null');
-      if (this.options().accentFill) {
-        if (v === true && this.options().showColorTrue)
-          classes.push('accent-fill-true');
-        if (v === false && this.options().showColorFalse)
-          classes.push('accent-fill-false');
-        if (v === null && this.options().showColorNull)
-          classes.push('accent-fill-null');
+      if (v === true && showColorTrue) classes.push('accent-true');
+      if (v === false && showColorFalse) classes.push('accent-false');
+      if (v === null && showColorNull) classes.push('accent-null');
+      if (accentFill) {
+        if (v === true && showColorTrue) classes.push('accent-fill-true');
+        if (v === false && showColorFalse) classes.push('accent-fill-false');
+        if (v === null && showColorNull) classes.push('accent-fill-null');
       }
       return classes;
     }
@@ -385,10 +409,9 @@ export class SchemaCardComponent {
   /**
    * Indica si una determinada clave debe representarse en **una sola línea** (nowrap).
    * @param key Clave a evaluar.
-   * @returns `true` si `key` está incluida en `options.noWrapKeys`.
+   * @returns `true` si `key` está incluida en `dataView.noWrapKeys`.
    */
   isNoWrapKey(key: string): boolean {
-    const list = this.options().noWrapKeys ?? [];
-    return list.includes(key);
+    return this.view().noWrapKeys.includes(key);
   }
 }

@@ -1,4 +1,8 @@
 // projects/schema/src/lib/models.ts
+// =======================================================
+// Definiciones de modelo para la librería Schema, sin SchemaOptions
+// (se reemplaza por SchemaSettings + DEFAULT_SETTINGS).
+// =======================================================
 
 /**
  * Dirección de layout del grafo.
@@ -20,7 +24,7 @@ export type LayoutAlign = 'firstChild' | 'center';
  * - 'curve':      curva cúbica con puntos de control laterales.
  * - 'line':       recta simple entre origen y destino.
  */
-export type LinkStyle = 'orthogonal' | 'curve' | 'line';
+export type LinkStyle = 'curve' | 'orthogonal' | 'line';
 
 /**
  * Modo de título para el template por defecto de la card.
@@ -134,286 +138,100 @@ export interface NormalizedGraph {
 }
 
 /**
- * Opciones planas históricas (compatibilidad).
- * @deprecated Se recomienda usar {@link SchemaSettings}; estas opciones siguen vigentes
- *             y son la base efectiva tras el merge.
- */
-export interface SchemaOptions {
-  // ===== Extracción / preview =====
-
-  /**
-   * Prioridad de claves para derivar título.
-   * @example ["name","title","id"]
-   */
-  titleKeyPriority: string[];
-
-  /**
-   * Claves globales ocultas en el preview de atributos.
-   * @default []
-   */
-  hiddenKeysGlobal?: string[];
-
-  /**
-   * Si true, colapsa contenedores que sean arrays "envolventes" innecesarios.
-   * @default true
-   */
-  collapseArrayContainers: boolean;
-
-  /**
-   * Si true, colapsa wrappers con único hijo objeto y sin escalares.
-   * @default true
-   */
-  collapseSingleChildWrappers: boolean;
-
-  /**
-   * Profundidad máxima de recorrido.
-   * @default null (sin límite)
-   */
-  maxDepth: number | null;
-
-  /**
-   * Máximo de atributos a previsualizar por card.
-   * @default 4
-   */
-  previewMaxKeys: number;
-
-  /**
-   * Si true, arrays de escalares se muestran como atributo concatenado.
-   * @default true
-   */
-  treatScalarArraysAsAttribute: boolean;
-
-  // ===== Tamaño base de las cards =====
-
-  /**
-   * Tamaño base por defecto de cada card (antes de medición).
-   * @default { width: 220, height: 96 }
-   */
-  defaultNodeSize?: { width: number; height: number };
-
-  // ===== Enlaces / layout =====
-
-  /** Color del trazo de aristas. @default '#019df4' */
-  linkStroke?: string;
-
-  /** Grosor del trazo de aristas. @default 2 */
-  linkStrokeWidth?: number;
-
-  /** Alineación padre ↔ hijos. @default 'center' */
-  layoutAlign?: LayoutAlign;
-
-  /** Estilo de arista. @default 'orthogonal' */
-  linkStyle?: LinkStyle;
-
-  /**
-   * Tensión de curva para linkStyle='curve'.
-   * Rango efectivo 20–200 (clamp interno).
-   * @default 80
-   */
-  curveTension?: number;
-
-  /**
-   * Clave booleana para acentuar cards por valor true/false/null.
-   * @example "in_damage"
-   * @default null
-   */
-  accentByKey?: string | null;
-
-  /**
-   * Si true, aplica fondo además del borde al acentuar.
-   * @default false
-   */
-  accentFill?: boolean;
-
-  /**
-   * Si true, invierte mapping de colores (true↔false).
-   * @default false
-   */
-  accentInverse?: boolean;
-
-  /**
-   * Si true, muestra color cuando v===true para accentByKey.
-   * @default false
-   */
-  showColorTrue?: boolean;
-
-  /**
-   * Si true, muestra color cuando v===false para accentByKey.
-   * @default false
-   */
-  showColorFalse?: boolean;
-
-  /**
-   * Si true, muestra color cuando v===null para accentByKey.
-   * @default false
-   */
-  showColorNull?: boolean;
-
-  /** Modo de título de card por defecto. @default 'auto' */
-  titleMode?: TitleMode;
-
-  /** Dirección del layout. @default 'RIGHT' */
-  layoutDirection?: LayoutDirection;
-
-  /**
-   * Umbral horizontal (dx) bajo el cual un enlace 'curve' se dibuja recto.
-   * Evita curvas raras cuando los nodos están muy cerca.
-   * @default 160
-   */
-  straightThresholdDx?: number;
-
-  // ===== Auto-resize de cards =====
-
-  /**
-   * Si true, mide DOM y relayout hasta estabilizar tamaños.
-   * @default true
-   */
-  autoResizeCards?: boolean;
-
-  /**
-   * Ancho máximo de card (limita crecimiento).
-   * @default null (sin límite)
-   */
-  maxCardWidth?: number | null;
-
-  /**
-   * Alto máximo de card (limita crecimiento).
-   * @default null (sin límite)
-   */
-  maxCardHeight?: number | null;
-
-  /**
-   * Claves cuyos valores NO deben hacer wrap de línea.
-   * @example ["port_name","cto_name"]
-   * @default []
-   */
-  noWrapKeys?: string[];
-
-  // ===== Alineaciones opcionales =====
-
-  /**
-   * Ajusta verticalmente los hijos del root a una misma línea central.
-   * @default false
-   */
-  snapRootChildrenY?: boolean;
-
-  /**
-   * Alinea cadenas lineales (out=1,in=1) para trazado recto.
-   * @default true
-   */
-  snapChainSegmentsY?: boolean;
-
-  // ===== Colchón extra al medir DOM =====
-
-  /**
-   * px extra a sumar a scrollWidth durante medición.
-   * @default 24
-   */
-  measureExtraWidthPx?: number;
-
-  /**
-   * px extra a sumar a scrollHeight durante medición.
-   * @default 0
-   */
-  measureExtraHeightPx?: number;
-
-  // ===== Depuración =====
-
-  /**
-   * Flags de depuración.
-   * - measure: logs de medición DOM.
-   * - layout:  logs de layout/relayout.
-   * - paintBounds: dibuja bounds de las cards.
-   * - exposeOnWindow: expone `schemaDebug` en window.
-   * @default { measure:false, layout:false, paintBounds:false, exposeOnWindow:false }
-   */
-  debug?: {
-    /** Si true, log de medición. */
-    measure?: boolean;
-    /** Si true, log de layout/relayout. */
-    layout?: boolean;
-    /** Si true, pinta bounds de cards. */
-    paintBounds?: boolean;
-    /** Si true, expone `schemaDebug` en window. */
-    exposeOnWindow?: boolean;
-  };
-}
-
-/**
- * Contenedor recomendado de settings por secciones.
- * Si no se pasa, se aplican defaults seguros desde {@link DEFAULT_OPTIONS}.
- * @remarks `SchemaSettings` se fusiona internamente para producir `SchemaOptions` efectivos.
+ * Contenedor de settings por secciones.
+ * Si no se especifica alguna sección/prop, se aplican defaults desde {@link DEFAULT_SETTINGS}.
+ *
+ * @example Activar enlaces curvos y acento por booleano
+ * ```ts
+ * const settings: SchemaSettings = {
+ *   colors: { linkStroke: '#019df4', linkStrokeWidth: 2, accentByKey: 'certified' },
+ *   layout: { linkStyle: 'curve', layoutAlign: 'center' },
+ *   dataView: { enableCollapse: true }
+ * };
+ * ```
  */
 export interface SchemaSettings {
   /** Colores y acentos. */
   colors?: {
-    /** Color de aristas. */
+    /** Color de aristas (stroke). @default '#019df4' */
     linkStroke?: string;
-    /** Grosor de aristas. */
+    /** Grosor del trazo de aristas. @default 2 */
     linkStrokeWidth?: number;
-    /** Clave booleana para acentuar cards (true/false/null). */
+    /** Clave booleana para acentuar cards (true/false/null). @default null */
     accentByKey?: string | null;
-    /** Aplica fondo de acento además del borde. */
+    /** Aplica fondo de acento además del borde. @default false */
     accentFill?: boolean;
-    /** Invierte mapping de colores (true↔false). */
+    /** Invierte mapping de colores (true↔false). @default false */
     accentInverse?: boolean;
-    /** Muestra color cuando v===true. */
+    /** Muestra color cuando v===true. @default false */
     showColorTrue?: boolean;
-    /** Muestra color cuando v===false. */
+    /** Muestra color cuando v===false. @default false */
     showColorFalse?: boolean;
-    /** Muestra color cuando v===null. */
+    /** Muestra color cuando v===null. @default false */
     showColorNull?: boolean;
   };
 
   /** Parámetros visuales del layout y ruteo. */
   layout?: {
-    /** Dirección del layout general (RIGHT/DOWN). */
+    /** Dirección del layout general. @default 'RIGHT' */
     layoutDirection?: LayoutDirection;
-    /** Alineación padre ↔ hijos. */
+    /** Alineación padre ↔ hijos. @default 'center' */
     layoutAlign?: LayoutAlign;
-    /** Estilo de arista. */
+    /** Estilo de arista. @default 'curve' */
     linkStyle?: LinkStyle;
-    /** Tensión de curva para linkStyle='curve'. */
+    /**
+     * Tensión de curva para linkStyle='curve'. Clamp 20–200.
+     * @default 80
+     */
     curveTension?: number;
-    /** Umbral para forzar recta si dx es pequeño en curvas. */
+    /**
+     * Umbral horizontal (dx) bajo el cual un enlace 'curve' se dibuja recto.
+     * @default 160
+     */
     straightThresholdDx?: number;
-    /** Alinea verticalmente hijos del root. */
+    /**
+     * Alinea verticalmente los hijos del root a una misma línea central.
+     * @default false
+     */
     snapRootChildrenY?: boolean;
-    /** Alinea cadenas lineales (out=1,in=1). */
+    /**
+     * Alinea cadenas lineales (out=1,in=1) para trazado recto.
+     * @default false
+     */
     snapChainSegmentsY?: boolean;
   };
 
   /** Cómo extraer/mostrar datos en cards y medición. */
   dataView?: {
-    /** Prioridad de claves para derivar título. */
+    /** Prioridad de claves para derivar título. @default ['name','title','id','label'] */
     titleKeyPriority?: string[];
-    /** Claves globales ocultas en el preview. */
+    /** Claves globales ocultas en el preview. @default [] */
     hiddenKeysGlobal?: string[];
-    /** Modo de título del template por defecto. */
+    /** Modo de título del template por defecto. @default 'auto' */
     titleMode?: TitleMode;
-    /** Máximo de atributos en preview. */
+    /** Máximo de atributos en preview. @default 4 */
     previewMaxKeys?: number;
-    /** Arrays escalares como atributo concatenado. */
+    /** Arrays escalares como atributo concatenado. @default true */
     treatScalarArraysAsAttribute?: boolean;
-    /** Colapsar contenedores array envolventes. */
+    /** Colapsar contenedores array envolventes. @default true */
     collapseArrayContainers?: boolean;
-    /** Colapsar wrappers de único hijo sin escalares. */
+    /** Colapsar wrappers de único hijo sin escalares. @default true */
     collapseSingleChildWrappers?: boolean;
-    /** Profundidad máxima de recorrido. */
+    /** Profundidad máxima de recorrido (null = sin límite). @default null */
     maxDepth?: number | null;
-    /** Tamaño base por defecto de card. */
+    /** Tamaño base por defecto de card. @default { width: 220, height: 96 } */
     defaultNodeSize?: { width: number; height: number };
-    /** Claves que no deben hacer wrap. */
+    /** Claves que no deben hacer wrap. @default [] */
     noWrapKeys?: string[];
-    /** Ancho máximo de card. */
+    /** Ancho máximo de card. @default null (sin límite) */
     maxCardWidth?: number | null;
-    /** Alto máximo de card. */
+    /** Alto máximo de card. @default null (sin límite) */
     maxCardHeight?: number | null;
-    /** Medir DOM y relayout hasta estabilizar. */
+    /** Medir DOM y relayout hasta estabilizar. @default true */
     autoResizeCards?: boolean;
-    /** Colchón extra en ancho al medir. */
+    /** Colchón extra en ancho al medir. @default 24 */
     measureExtraWidthPx?: number;
-    /** Colchón extra en alto al medir. */
+    /** Colchón extra en alto al medir. @default 0 */
     measureExtraHeightPx?: number;
 
     /**
@@ -427,15 +245,15 @@ export interface SchemaSettings {
 
   /** Estados y textos de mensajes/overlays. */
   messages?: {
-    /** Modo cargando (overlay). */
+    /** Modo cargando (overlay). @default false */
     isLoading?: boolean;
-    /** Modo error (overlay). */
+    /** Modo error (overlay). @default false */
     isError?: boolean;
-    /** Mensaje para estado vacío. */
+    /** Mensaje para estado vacío. @default 'No hay datos para mostrar' */
     emptyMessage?: string;
-    /** Mensaje de carga. */
+    /** Mensaje de carga. @default 'Cargando…' */
     loadingMessage?: string;
-    /** Mensaje de error. */
+    /** Mensaje de error. @default 'Error al cargar el esquema' */
     errorMessage?: string;
   };
 
@@ -462,66 +280,82 @@ export interface SchemaSettings {
 
   /** Flags de depuración. */
   debug?: {
-    /** Log de medición. */
+    /** Log de medición. @default false */
     measure?: boolean;
-    /** Log de layout/relayout. */
+    /** Log de layout/relayout. @default false */
     layout?: boolean;
-    /** Dibuja bounds de cards. */
+    /** Dibuja bounds de cards. @default false */
     paintBounds?: boolean;
-    /** Expone `schemaDebug` en window. */
+    /** Expone `schemaDebug` en window. @default false */
     exposeOnWindow?: boolean;
   };
 }
 
 /**
- * Valores por defecto seguros para renderizar y medir el grafo.
- * @constant
- * @remarks Base para merge con opciones planas y settings seccionados.
+ * Valores por defecto seguros (por secciones) para renderizar y medir el grafo.
+ * Usa este objeto como base y combina con tus propios `SchemaSettings`.
+ *
+ * @example
+ * ```ts
+ * import { DEFAULT_SETTINGS, SchemaSettings } from '@miguimono/schema';
+ *
+ * const settings: SchemaSettings = {
+ *   ...DEFAULT_SETTINGS,
+ *   layout: { ...DEFAULT_SETTINGS.layout, linkStyle: 'orthogonal' },
+ *   colors: { ...DEFAULT_SETTINGS.colors, linkStroke: '#00B8A9' }
+ * };
+ * ```
  */
-export const DEFAULT_OPTIONS: SchemaOptions = {
-  // Extracción / preview
-  titleKeyPriority: ['name', 'title', 'id', 'label'],
-  hiddenKeysGlobal: [],
-  collapseArrayContainers: true,
-  collapseSingleChildWrappers: true,
-  maxDepth: null,
-  previewMaxKeys: 4,
-  treatScalarArraysAsAttribute: true,
-
-  // Tamaño base
-  defaultNodeSize: { width: 220, height: 96 },
-
-  // Enlaces / layout
-  linkStroke: '#019df4',
-  linkStrokeWidth: 2,
-  layoutAlign: 'center',
-  linkStyle: 'orthogonal',
-  curveTension: 80,
-  accentByKey: null,
-  accentFill: false,
-  accentInverse: false,
-  showColorTrue: false,
-  showColorFalse: false,
-  showColorNull: false,
-  titleMode: 'auto',
-  layoutDirection: 'RIGHT',
-  straightThresholdDx: 160,
-
-  // Auto-resize
-  autoResizeCards: true,
-  maxCardWidth: null,
-  maxCardHeight: null,
-  noWrapKeys: [],
-
-  // Alineaciones
-  snapRootChildrenY: false,
-  snapChainSegmentsY: true,
-
-  // Colchón medición
-  measureExtraWidthPx: 24,
-  measureExtraHeightPx: 0,
-
-  // Debug
+export const DEFAULT_SETTINGS: Required<SchemaSettings> = {
+  colors: {
+    linkStroke: '#019df4',
+    linkStrokeWidth: 2,
+    accentByKey: null,
+    accentFill: false,
+    accentInverse: false,
+    showColorTrue: false,
+    showColorFalse: false,
+    showColorNull: false,
+  },
+  layout: {
+    layoutDirection: 'RIGHT',
+    layoutAlign: 'firstChild',
+    linkStyle: 'curve',
+    curveTension: 80,
+    straightThresholdDx: 160,
+    snapRootChildrenY: false,
+    snapChainSegmentsY: false,
+  },
+  dataView: {
+    titleKeyPriority: ['name', 'title', 'id', 'label'],
+    hiddenKeysGlobal: [],
+    titleMode: 'auto',
+    previewMaxKeys: 4,
+    treatScalarArraysAsAttribute: true,
+    collapseArrayContainers: true,
+    collapseSingleChildWrappers: true,
+    maxDepth: null,
+    defaultNodeSize: { width: 220, height: 96 },
+    noWrapKeys: [],
+    maxCardWidth: null,
+    maxCardHeight: null,
+    autoResizeCards: true,
+    measureExtraWidthPx: 24,
+    measureExtraHeightPx: 0,
+    enableCollapse: false,
+  },
+  messages: {
+    isLoading: false,
+    isError: false,
+    emptyMessage: 'No hay datos para mostrar',
+    loadingMessage: 'Cargando…',
+    errorMessage: 'Error al cargar el esquema',
+  },
+  viewport: {
+    height: 800,
+    minHeight: 480,
+    showToolbar: true,
+  },
   debug: {
     measure: false,
     layout: false,
