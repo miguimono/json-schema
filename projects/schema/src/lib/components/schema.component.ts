@@ -24,33 +24,21 @@ import {
   input,
   signal,
   computed,
-} from '@angular/core';
-import { CommonModule, NgFor, NgIf } from '@angular/common';
+} from "@angular/core";
+import { CommonModule, NgFor, NgIf } from "@angular/common";
 
-import { JsonAdapterService } from '../services/json-adapter.service';
-import { SchemaLayoutService } from '../services/schema-layout.service';
+import { JsonAdapterService } from "../services/json-adapter.service";
+import { SchemaLayoutService } from "../services/schema-layout.service";
 
-import {
-  NormalizedGraph,
-  SchemaEdge,
-  SchemaNode,
-  SchemaSettings,
-  DEFAULT_SETTINGS,
-} from '../models';
+import { NormalizedGraph, SchemaEdge, SchemaNode, SchemaSettings, DEFAULT_SETTINGS } from "../models";
 
-import { SchemaCardComponent } from './schema-card.component';
-import { SchemaLinksComponent } from './schema-links.component';
+import { SchemaCardComponent } from "./schema-card.component";
+import { SchemaLinksComponent } from "./schema-links.component";
 
 @Component({
-  selector: 'schema',
+  selector: "schema",
   standalone: true,
-  imports: [
-    CommonModule,
-    NgFor,
-    NgIf,
-    SchemaCardComponent,
-    SchemaLinksComponent,
-  ],
+  imports: [CommonModule, NgFor, NgIf, SchemaCardComponent, SchemaLinksComponent],
   template: `
     <div
       class="schema-root"
@@ -65,10 +53,7 @@ import { SchemaLinksComponent } from './schema-links.component';
       [style.minHeight.px]="minViewportHeight()"
     >
       <!-- ===== Toolbar (opcional) ===== -->
-      <div
-        class="schema-toolbar"
-        *ngIf="showToolbar() && !isLoadingView() && !isErrorView()"
-      >
+      <div class="schema-toolbar" *ngIf="showToolbar() && !isLoadingView() && !isErrorView()">
         <div class="left">
           <button type="button" (click)="zoomOut()" title="Zoom out">−</button>
           <button type="button" (click)="zoomIn()" title="Zoom in">+</button>
@@ -78,11 +63,7 @@ import { SchemaLinksComponent } from './schema-links.component';
         <div class="right">
           <label>
             Enlaces:
-            <select
-              #ls
-              [value]="opt_linkStyle()"
-              (change)="setLinkStyle(ls.value)"
-            >
+            <select #ls [value]="opt_linkStyle()" (change)="setLinkStyle(ls.value)">
               <option value="curve">Curvo</option>
               <option value="orthogonal">Ortogonal</option>
               <option value="line">Lineal</option>
@@ -91,11 +72,7 @@ import { SchemaLinksComponent } from './schema-links.component';
 
           <label>
             Alineación:
-            <select
-              #la
-              [value]="opt_layoutAlign()"
-              (change)="setLayoutAlign(la.value)"
-            >
+            <select #la [value]="opt_layoutAlign()" (change)="setLayoutAlign(la.value)">
               <option value="firstChild">Superior</option>
               <option value="center">Centrado</option>
             </select>
@@ -122,11 +99,7 @@ import { SchemaLinksComponent } from './schema-links.component';
       </div>
 
       <!-- ===== Stage ===== -->
-      <div
-        class="stage"
-        [style.transform]="transform()"
-        *ngIf="!isLoadingView() && !isErrorView()"
-      >
+      <div class="stage" [style.transform]="transform()" *ngIf="!isLoadingView() && !isErrorView()">
         <schema-links
           [edges]="edges()"
           [settings]="effectiveSettings()"
@@ -238,12 +211,7 @@ import { SchemaLinksComponent } from './schema-links.component';
       .loading .shimmer {
         position: absolute;
         inset: 0;
-        background: linear-gradient(
-          to right,
-          #e0e0e0 8%,
-          #f0f0f0 18%,
-          #e0e0e0 33%
-        );
+        background: linear-gradient(to right, #e0e0e0 8%, #f0f0f0 18%, #e0e0e0 33%);
         background-size: 1000px 100%;
         animation: shimmer 3s infinite linear;
         opacity: 0.9;
@@ -288,9 +256,9 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
   // Estados/overlays (pueden venir por settings.messages también)
   isLoading = input<boolean>(false);
   isError = input<boolean>(false);
-  emptyMessage = input<string>('No hay datos para mostrar');
-  loadingMessage = input<string>('Cargando…');
-  errorMessage = input<string>('Error al cargar el esquema');
+  emptyMessage = input<string>("No hay datos para mostrar");
+  loadingMessage = input<string>("Cargando…");
+  errorMessage = input<string>("Error al cargar el esquema");
 
   // Viewport (pueden venir por settings.viewport)
   viewportHeight = signal<number>(800);
@@ -308,7 +276,7 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
   nodes = computed(() => this.graph().nodes);
   edges = computed(() => this.graph().edges);
 
-  @ViewChild('root', { static: true }) rootRef!: ElementRef<HTMLElement>;
+  @ViewChild("root", { static: true }) rootRef!: ElementRef<HTMLElement>;
 
   // ===== Pan/zoom =====
   private scale = signal(1);
@@ -317,9 +285,7 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
   private tx = signal(0);
   private ty = signal(0);
 
-  transform = computed(
-    () => `translate(${this.tx()}px, ${this.ty()}px) scale(${this.scale()})`
-  );
+  transform = computed(() => `translate(${this.tx()}px, ${this.ty()}px) scale(${this.scale()})`);
 
   virtualWidth = 12000;
   virtualHeight = 6000;
@@ -329,25 +295,15 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
   private lastY = 0;
 
   // ===== Toolbar (overrides de layout visual) =====
-  opt_linkStyle = signal<'orthogonal' | 'curve' | 'line'>('orthogonal');
-  opt_layoutAlign = signal<'firstChild' | 'center'>('center');
+  opt_linkStyle = signal<"orthogonal" | "curve" | "line">("orthogonal");
+  opt_layoutAlign = signal<"firstChild" | "center">("center");
 
   // ===== Vista derivada (mensajes) =====
-  isLoadingView = computed(
-    () => this.settings()?.messages?.isLoading ?? this.isLoading()
-  );
-  isErrorView = computed(
-    () => this.settings()?.messages?.isError ?? this.isError()
-  );
-  emptyMessageView = computed(
-    () => this.settings()?.messages?.emptyMessage ?? this.emptyMessage()
-  );
-  loadingMessageView = computed(
-    () => this.settings()?.messages?.loadingMessage ?? this.loadingMessage()
-  );
-  errorMessageView = computed(
-    () => this.settings()?.messages?.errorMessage ?? this.errorMessage()
-  );
+  isLoadingView = computed(() => this.settings()?.messages?.isLoading ?? this.isLoading());
+  isErrorView = computed(() => this.settings()?.messages?.isError ?? this.isError());
+  emptyMessageView = computed(() => this.settings()?.messages?.emptyMessage ?? this.emptyMessage());
+  loadingMessageView = computed(() => this.settings()?.messages?.loadingMessage ?? this.loadingMessage());
+  errorMessageView = computed(() => this.settings()?.messages?.errorMessage ?? this.errorMessage());
 
   // ===== Colapso/expansión =====
   private childrenById = new Map<string, string[]>();
@@ -355,13 +311,11 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
   private collapsed = new Set<string>();
 
   /** Flag derivado: `settings.dataView.enableCollapse`. */
-  enableCollapse = computed<boolean>(
-    () => !!this.settings()?.dataView?.enableCollapse
-  );
+  enableCollapse = computed<boolean>(() => !!this.settings()?.dataView?.enableCollapse);
 
   constructor(
     private adapter: JsonAdapterService,
-    private layoutService: SchemaLayoutService
+    private layoutService: SchemaLayoutService,
   ) {}
 
   // ===== Merge a settings efectivos =====
@@ -402,23 +356,13 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     const b = this.baseSettings();
 
     // viewport
-    this.viewportHeight.set(
-      b.viewport?.height ?? DEFAULT_SETTINGS.viewport!.height!
-    );
-    this.minViewportHeight.set(
-      b.viewport?.minHeight ?? DEFAULT_SETTINGS.viewport!.minHeight!
-    );
-    this.showToolbar.set(
-      b.viewport?.showToolbar ?? DEFAULT_SETTINGS.viewport!.showToolbar!
-    );
+    this.viewportHeight.set(b.viewport?.height ?? DEFAULT_SETTINGS.viewport!.height!);
+    this.minViewportHeight.set(b.viewport?.minHeight ?? DEFAULT_SETTINGS.viewport!.minHeight!);
+    this.showToolbar.set(b.viewport?.showToolbar ?? DEFAULT_SETTINGS.viewport!.showToolbar!);
 
     // selectors: toman el valor por defecto real (o el del usuario), NO lo pisamos
-    this.opt_linkStyle.set(
-      (b.layout?.linkStyle ?? DEFAULT_SETTINGS.layout!.linkStyle!) as any
-    );
-    this.opt_layoutAlign.set(
-      (b.layout?.layoutAlign ?? DEFAULT_SETTINGS.layout!.layoutAlign!) as any
-    );
+    this.opt_linkStyle.set((b.layout?.linkStyle ?? DEFAULT_SETTINGS.layout!.linkStyle!) as any);
+    this.opt_layoutAlign.set((b.layout?.layoutAlign ?? DEFAULT_SETTINGS.layout!.layoutAlign!) as any);
   }
 
   // ===== Ciclo de vida =====
@@ -481,13 +425,10 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
 
     const visibleNodeSet = new Set<string>();
     for (const n of full.nodes) {
-      if (this.isVisibleNodeByCollapsedAncestors(n.id))
-        visibleNodeSet.add(n.id);
+      if (this.isVisibleNodeByCollapsedAncestors(n.id)) visibleNodeSet.add(n.id);
     }
     const nodes = full.nodes.filter((n) => visibleNodeSet.has(n.id));
-    const edges = full.edges.filter(
-      (e) => visibleNodeSet.has(e.source) && visibleNodeSet.has(e.target)
-    );
+    const edges = full.edges.filter((e) => visibleNodeSet.has(e.source) && visibleNodeSet.has(e.target));
     return { nodes, edges, meta: full.meta };
   }
 
@@ -503,8 +444,7 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     await this.relayoutVisible(n.id, anchorBefore);
   }
 
-  hasChildren = (id: string): boolean =>
-    (this.childrenById.get(id)?.length ?? 0) > 0;
+  hasChildren = (id: string): boolean => (this.childrenById.get(id)?.length ?? 0) > 0;
   isNodeCollapsed = (id: string): boolean => this.collapsed.has(id);
 
   // ===== Pipeline principal =====
@@ -515,6 +455,7 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
 
     // 1) Normalizar grafo completo (adapter debe aceptar settings o mapearlos)
     const normalized = this.adapter.normalize(this.data(), s);
+    this.ensurePinMeta(normalized, s);
     this.fullGraph.set(this.cloneGraph(normalized));
 
     // 2) Índices
@@ -531,10 +472,7 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     this.graph.set(this.cloneGraph(laid));
 
     // 6) Medición y relayout (si está activo)
-    if (
-      s.dataView?.autoResizeCards ??
-      DEFAULT_SETTINGS.dataView!.autoResizeCards!
-    ) {
+    if (s.dataView?.autoResizeCards ?? DEFAULT_SETTINGS.dataView!.autoResizeCards!) {
       const maxPasses = 6;
       for (let pass = 1; pass <= maxPasses; pass++) {
         await this.nextFrame();
@@ -558,22 +496,17 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
         settings: s,
       };
       // eslint-disable-next-line no-console
-      console.log('schemaDebug disponible en window.schemaDebug');
+      console.log("schemaDebug disponible en window.schemaDebug");
     }
   }
 
-  private async relayoutVisible(
-    anchorId?: string,
-    anchorScreen?: { x: number; y: number }
-  ): Promise<void> {
+  private async relayoutVisible(anchorId?: string, anchorScreen?: { x: number; y: number }): Promise<void> {
     const s = this.effectiveSettings();
     const visible = this.buildVisibleGraphFromCollapsed();
+    this.ensurePinMeta(visible, s);
     let laid = await this.layoutService.layout(visible, s);
 
-    if (
-      s.dataView?.autoResizeCards ??
-      DEFAULT_SETTINGS.dataView!.autoResizeCards!
-    ) {
+    if (s.dataView?.autoResizeCards ?? DEFAULT_SETTINGS.dataView!.autoResizeCards!) {
       const maxPasses = 4;
       for (let pass = 1; pass <= maxPasses; pass++) {
         await this.nextFrame();
@@ -595,15 +528,13 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     const maxH = s.dataView?.maxCardHeight ?? Infinity;
 
     const root = this.rootRef.nativeElement;
-    const cards = Array.from(
-      root.querySelectorAll<HTMLElement>('.schema-card')
-    );
+    const cards = Array.from(root.querySelectorAll<HTMLElement>(".schema-card"));
 
     const map = new Map(this.graph().nodes.map((n) => [n.id, n]));
     let changed = false;
 
     for (const el of cards) {
-      const id = el.getAttribute('data-node-id') ?? undefined;
+      const id = el.getAttribute("data-node-id") ?? undefined;
       const node = (id ? map.get(id) : undefined) ?? null;
       if (!node) continue;
 
@@ -677,10 +608,7 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
 
     const oldScale = this.scale();
     const factor = 1 + (-e.deltaY > 0 ? 0.08 : -0.08);
-    const newScale = Math.max(
-      this.minScale(),
-      Math.min(this.maxScale(), oldScale * factor)
-    );
+    const newScale = Math.max(this.minScale(), Math.min(this.maxScale(), oldScale * factor));
 
     const worldX = (mouseX - this.tx()) / oldScale;
     const worldY = (mouseY - this.ty()) / oldScale;
@@ -692,7 +620,7 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
   onPointerDown(e: MouseEvent) {
     this.dragging = true;
     const el = e.target as HTMLElement;
-    if (el && el.closest && el.closest('.collapse-btn')) {
+    if (el && el.closest && el.closest(".collapse-btn")) {
       this.dragging = false;
       return;
     }
@@ -745,10 +673,7 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     const mouseY = rect.height / 2;
 
     const oldScale = this.scale();
-    const newScale = Math.max(
-      this.minScale(),
-      Math.min(this.maxScale(), oldScale * factor)
-    );
+    const newScale = Math.max(this.minScale(), Math.min(this.maxScale(), oldScale * factor));
 
     const worldX = (mouseX - this.tx()) / oldScale;
     const worldY = (mouseY - this.ty()) / oldScale;
@@ -758,13 +683,13 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
   }
 
   setLinkStyle(v: string) {
-    const ok = v === 'orthogonal' || v === 'curve' || v === 'line';
-    this.opt_linkStyle.set(ok ? (v as any) : 'orthogonal');
+    const ok = v === "orthogonal" || v === "curve" || v === "line";
+    this.opt_linkStyle.set(ok ? (v as any) : "orthogonal");
     this.relayoutVisible();
   }
   setLayoutAlign(v: string) {
-    const ok = v === 'firstChild' || v === 'center';
-    this.opt_layoutAlign.set(ok ? (v as any) : 'center');
+    const ok = v === "firstChild" || v === "center";
+    this.opt_layoutAlign.set(ok ? (v as any) : "center");
     this.relayoutVisible();
   }
 
@@ -781,10 +706,7 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     return { x: cx * s + this.tx(), y: cy * s + this.ty() };
   }
 
-  private applyAnchorAfterLayout(
-    nodeId: string,
-    targetScreen: { x: number; y: number }
-  ) {
+  private applyAnchorAfterLayout(nodeId: string, targetScreen: { x: number; y: number }) {
     const n = this.getNodeById(nodeId);
     if (!n) return;
     const s = this.scale();
@@ -798,7 +720,7 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     target: NormalizedGraph,
     durationMs = 260,
     anchorId?: string,
-    anchorScreen?: { x: number; y: number }
+    anchorScreen?: { x: number; y: number },
   ): Promise<void> {
     const start = this.cloneGraph(this.graph());
 
@@ -808,13 +730,9 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     const endEdgeById = new Map(target.edges.map((e) => [e.id, e]));
 
     const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-    const easeInOut = (t: number) =>
-      t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 
-    const alignPoints = (
-      a: Array<{ x: number; y: number }> = [],
-      b: Array<{ x: number; y: number }> = []
-    ) => {
+    const alignPoints = (a: Array<{ x: number; y: number }> = [], b: Array<{ x: number; y: number }> = []) => {
       const aa = a.length ? [...a] : [];
       const bb = b.length ? [...b] : [];
       const len = Math.max(aa.length, bb.length, 2);
@@ -872,14 +790,18 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
         requestAnimationFrame(() => run(resolve));
       } else {
         this.graph.set(this.cloneGraph(target));
-        if (anchorId && anchorScreen)
-          this.applyAnchorAfterLayout(anchorId, anchorScreen);
+        if (anchorId && anchorScreen) this.applyAnchorAfterLayout(anchorId, anchorScreen);
         resolve();
       }
     };
 
-    await new Promise<void>((resolve) =>
-      requestAnimationFrame(() => run(resolve))
-    );
+    await new Promise<void>((resolve) => requestAnimationFrame(() => run(resolve)));
+  }
+  /** Asegura que existan los mapas de pin en meta según la dirección del layout. */
+  private ensurePinMeta(g: NormalizedGraph, s: SchemaSettings): void {
+    if (!g.meta) g.meta = {};
+    const dir = s.layout?.layoutDirection ?? DEFAULT_SETTINGS.layout.layoutDirection;
+    const key = dir === "RIGHT" ? "pinY" : "pinX";
+    if (!g.meta[key]) g.meta[key] = {};
   }
 }
