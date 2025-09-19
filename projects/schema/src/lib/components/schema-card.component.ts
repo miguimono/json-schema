@@ -22,7 +22,7 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
  * Componente visual para renderizar un {@link SchemaNode} como card.
  *
  * ### Responsabilidades
- * - Renderiza un nodo con **título** (si `titleMode !== 'none'`), **preview** de atributos
+ * - Renderiza un nodo con **título** (si `showTitle === true`), **preview** de atributos
  *   (`jsonMeta.attributes`) y **badges** con conteos de arrays no escalares (`jsonMeta.arrayCounts`).
  * - Permite **template custom** vía `cardTemplate` (inserta el nodo como `$implicit`).
  * - Expone **acentos visuales** según settings de `colors` y `dataView`.
@@ -89,7 +89,7 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
 
       <ng-template #defaultTpl>
         <div class="card-body">
-          <div class="card-title" *ngIf="showTitle()">
+          <div class="card-title" *ngIf="this.view().showTitle">
             {{ node()?.jsonMeta?.title || node()?.label }}
           </div>
 
@@ -310,7 +310,7 @@ export class SchemaCardComponent {
     const s = this.settings() ?? DEFAULT_SETTINGS;
     return {
       // dataView
-      titleMode: s.dataView?.titleMode ?? 'auto',
+      showTitle: s.dataView?.showTitle ?? false,
       maxCardWidth: s.dataView?.maxCardWidth ?? null,
       maxCardHeight: s.dataView?.maxCardHeight ?? null,
       noWrapKeys: s.dataView?.noWrapKeys ?? [],
@@ -329,11 +329,6 @@ export class SchemaCardComponent {
   });
 
   // ===== API interna (métodos de ayuda) =====
-
-  /** Indica si debe mostrarse el título del template por defecto. */
-  showTitle(): boolean {
-    return (this.view().titleMode ?? 'auto') !== 'none';
-  }
 
   /**
    * Manejador de click sobre la card.

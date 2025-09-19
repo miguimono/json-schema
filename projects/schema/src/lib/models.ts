@@ -27,13 +27,6 @@ export type LayoutAlign = 'firstChild' | 'center';
 export type LinkStyle = 'curve' | 'orthogonal' | 'line';
 
 /**
- * Modo de título para el template por defecto de la card.
- * - 'auto': intenta derivarlo de claves prioritarias o primer escalar.
- * - 'none': no renderiza título en el template por defecto.
- */
-export type TitleMode = 'auto' | 'none';
-
-/**
  * Nodo del grafo normalizado.
  * Generado por {@link JsonAdapterService} y posicionado por {@link SchemaLayoutService}.
  */
@@ -65,7 +58,7 @@ export interface SchemaNode {
 
   /**
    * Metadatos calculados durante la normalización.
-   * - title: título sugerido (usado por defecto si titleMode !== 'none').
+   * - title: título sugerido (usado por defecto si showTitle === true).
    * - attributes: preview de pares clave/valor (escalares y arrays escalares).
    * - childrenCount: número de hijos directos en el grafo.
    * - arrayCounts: tamaños de arrays no escalares por clave.
@@ -181,12 +174,12 @@ export interface SchemaSettings {
     linkStyle?: LinkStyle;
     /**
      * Tensión de curva para linkStyle='curve'. Clamp 20–200.
-     * @default 80
+     * @default 30
      */
     curveTension?: number;
     /**
      * Umbral horizontal (dx) bajo el cual un enlace 'curve' se dibuja recto.
-     * @default 160
+     * @default 60
      */
     straightThresholdDx?: number;
     /**
@@ -208,7 +201,7 @@ export interface SchemaSettings {
     /** Claves globales ocultas en el preview. @default [] */
     hiddenKeysGlobal?: string[];
     /** Modo de título del template por defecto. @default 'auto' */
-    titleMode?: TitleMode;
+    showTitle?: boolean;
     /** Máximo de atributos en preview. @default 4 */
     previewMaxKeys?: number;
     /** Arrays escalares como atributo concatenado. @default true */
@@ -219,7 +212,7 @@ export interface SchemaSettings {
     collapseSingleChildWrappers?: boolean;
     /** Profundidad máxima de recorrido (null = sin límite). @default null */
     maxDepth?: number | null;
-    /** Tamaño base por defecto de card. @default { width: 220, height: 96 } */
+    /** Tamaño base por defecto de card. @default { width: 320, height: 96 } */
     defaultNodeSize?: { width: number; height: number };
     /** Claves que no deben hacer wrap. @default [] */
     noWrapKeys?: string[];
@@ -307,6 +300,13 @@ export interface SchemaSettings {
  * ```
  */
 export const DEFAULT_SETTINGS: Required<SchemaSettings> = {
+  messages: {
+    isLoading: false,
+    isError: false,
+    emptyMessage: 'No hay datos para mostrar',
+    loadingMessage: 'Cargando…',
+    errorMessage: 'Error al cargar el esquema',
+  },
   colors: {
     linkStroke: '#019df4',
     linkStrokeWidth: 2,
@@ -321,36 +321,30 @@ export const DEFAULT_SETTINGS: Required<SchemaSettings> = {
     layoutDirection: 'RIGHT',
     layoutAlign: 'firstChild',
     linkStyle: 'curve',
-    curveTension: 80,
-    straightThresholdDx: 160,
+    curveTension: 30,
+    straightThresholdDx: 60,
     snapRootChildrenY: false,
     snapChainSegmentsY: true,
   },
   dataView: {
     titleKeyPriority: ['name', 'title', 'id', 'label'],
     hiddenKeysGlobal: [],
-    titleMode: 'auto',
-    previewMaxKeys: 4,
+    showTitle: false,
+    previewMaxKeys: 5,
     treatScalarArraysAsAttribute: true,
     collapseArrayContainers: true,
     collapseSingleChildWrappers: true,
     maxDepth: null,
-    defaultNodeSize: { width: 220, height: 96 },
+    defaultNodeSize: { width: 256, height: 64 },
     noWrapKeys: [],
     maxCardWidth: null,
     maxCardHeight: null,
     autoResizeCards: true,
-    measureExtraWidthPx: 24,
+    measureExtraWidthPx: 16,
     measureExtraHeightPx: 0,
     enableCollapse: false,
   },
-  messages: {
-    isLoading: false,
-    isError: false,
-    emptyMessage: 'No hay datos para mostrar',
-    loadingMessage: 'Cargando…',
-    errorMessage: 'Error al cargar el esquema',
-  },
+
   viewport: {
     height: 800,
     minHeight: 480,

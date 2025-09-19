@@ -427,6 +427,9 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
   ngAfterViewInit(): void {
     this.recomputeFromSettings();
     this.compute();
+    console.log('XXX - this.data()', this.data());
+    console.log('XXX - this.settings()', this.settings());
+    console.log('XXX - this.cardTemplate()', this.cardTemplate());
   }
 
   ngOnChanges(_: SimpleChanges): void {
@@ -564,16 +567,20 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
       console.log('schemaDebug disponible en window.schemaDebug');
     }
   }
-
   private async relayoutVisible(
     anchorId?: string,
     anchorScreen?: { x: number; y: number }
   ): Promise<void> {
     const s = this.effectiveSettings();
-    const visible = this.buildVisibleGraphFromCollapsed();
-    this.ensurePinMeta(visible, s);
-    let laid = await this.layoutService.layout(visible, s);
 
+    // 1) Subgrafo visible (parte de fullGraph, que ya persiste tamaños medidos)
+    const visible = this.buildVisibleGraphFromCollapsed();
+
+    // 2) Layout inicial y lo aplicamos al grafo visible
+    let laid = await this.layoutService.layout(visible, s);
+    this.graph.set(this.cloneGraph(laid));
+
+    // 3) Medición + relayout incremental usando SIEMPRE this.graph()
     if (
       s.dataView?.autoResizeCards ??
       DEFAULT_SETTINGS.dataView!.autoResizeCards!
@@ -583,14 +590,24 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
         await this.nextFrame();
         const changed = this.measureAndApply(pass, !!s.debug?.measure);
         if (!changed) break;
-        laid = await this.layoutService.layout(visible, s);
+
+        // relayout con el grafo que ACABA de medir
+        laid = await this.layoutService.layout(this.graph(), s);
+        this.graph.set(this.cloneGraph(laid));
       }
     }
+
+    // 4) Ajustar tamaño del stage y animar con anclaje
     this.updateVirtualSizeFromGraph(laid);
     await this.animateToGraph(laid, 260, anchorId, anchorScreen);
   }
 
   // ===== Medición DOM =====
+  /**
+   * Mide el tamaño intrínseco de cada card (forzando width/height:auto
+   * temporalmente) para evitar sumar extraW/extraH en cada relayout.
+   * También persiste los tamaños medidos en `fullGraph` para futuros relayouts.
+   */
   private measureAndApply(_pass: number, _log = false): boolean {
     const s = this.effectiveSettings();
     const extraW = s.dataView?.measureExtraWidthPx ?? 0;
@@ -603,26 +620,50 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
       root.querySelectorAll<HTMLElement>('.schema-card')
     );
 
-    const map = new Map(this.graph().nodes.map((n) => [n.id, n]));
+    const visMap = new Map(this.graph().nodes.map((n) => [n.id, n]));
+    const fullMap = new Map(this.fullGraph().nodes.map((n) => [n.id, n]));
+
     let changed = false;
 
     for (const el of cards) {
       const id = el.getAttribute('data-node-id') ?? undefined;
-      const node = (id ? map.get(id) : undefined) ?? null;
+      if (!id) continue;
+
+      const node = visMap.get(id);
       if (!node) continue;
 
-      const w = Math.ceil(el.scrollWidth + extraW);
-      const h = Math.ceil(el.scrollHeight + extraH);
+      // Guardamos estilos actuales y medimos tamaño intrínseco (auto)
+      const prevW = el.style.width;
+      const prevH = el.style.height;
 
-      const cw = Math.min(w, maxW);
-      const ch = Math.min(h, maxH);
+      el.style.width = 'auto';
+      el.style.height = 'auto';
 
-      if ((node.width ?? 0) !== cw || (node.height ?? 0) !== ch) {
-        node.width = cw;
-        node.height = ch;
+      // Fuerza reflow y toma medidas intrínsecas
+      const wIntrinsic = Math.ceil(el.scrollWidth);
+      const hIntrinsic = Math.ceil(el.scrollHeight);
+
+      // Restauramos estilos para no parpadear
+      el.style.width = prevW;
+      el.style.height = prevH;
+
+      const targetW = Math.min(wIntrinsic + extraW, maxW);
+      const targetH = Math.min(hIntrinsic + extraH, maxH);
+
+      if ((node.width ?? 0) !== targetW || (node.height ?? 0) !== targetH) {
+        node.width = targetW;
+        node.height = targetH;
         changed = true;
+
+        // Persistimos también en el grafo completo para futuros relayouts
+        const full = fullMap.get(id);
+        if (full) {
+          full.width = targetW;
+          full.height = targetH;
+        }
       }
     }
+
     return changed;
   }
 
