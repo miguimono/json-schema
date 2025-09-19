@@ -105,13 +105,13 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
                 [class.v-true]="kv[1] === true"
                 [class.v-false]="kv[1] === false"
                 [class.nowrap]="isNoWrapKey(kv[0])"
+                [attr.title]="valueTitle(kv[1])"
               >
-                {{ kv[1] }}
+                {{ displayValue(kv[1]) }}
               </span>
               }
             </div>
           </div>
-
           <div
             class="array-badges"
             *ngIf="node()?.jsonMeta?.arrayCounts as arrs"
@@ -314,6 +314,8 @@ export class SchemaCardComponent {
       maxCardWidth: s.dataView?.maxCardWidth ?? null,
       maxCardHeight: s.dataView?.maxCardHeight ?? null,
       noWrapKeys: s.dataView?.noWrapKeys ?? [],
+      valueShowTooltip: s.dataView?.valueShowTooltip ?? false,
+      valueMaxChars: s.dataView?.valueMaxChars ?? null,
 
       // colors (acentos)
       accentByKey: s.colors?.accentByKey ?? null,
@@ -433,5 +435,28 @@ export class SchemaCardComponent {
     // Colapsado → mostrar “expandir hacia la derecha” (▶)
     // Expandido → mostrar “colapsar hacia la izquierda” (◀)
     return collapsed ? '▶' : '◀';
+  }
+  /**
+   * Devuelve el texto a mostrar, truncando según valueMaxChars.
+   * Aplica a strings, numbers y cadenas pre-concatenadas de arrays escalares.
+   */
+  displayValue(val: any): string {
+    // Normaliza a string (booleans quedan "true"/"false")
+    const str = val == null ? String(val) : String(val);
+    const limit = this.view().valueMaxChars;
+
+    if (typeof limit === 'number' && limit > 0 && str.length > limit) {
+      return str.slice(0, limit) + '…';
+    }
+    return str;
+  }
+
+  /**
+   * Título (tooltip) con el valor completo si valueShowTooltip es true.
+   * Si es false, no agrega atributo title.
+   */
+  valueTitle(val: any): string | null {
+    if (!this.view().valueShowTooltip) return null;
+    return val == null ? String(val) : String(val);
   }
 }

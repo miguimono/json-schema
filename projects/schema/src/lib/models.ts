@@ -234,6 +234,13 @@ export interface SchemaSettings {
      * @default false
      */
     enableCollapse?: boolean;
+    /** Mostrar tooltip (title) con el valor completo en los atributos. @default false */
+    valueShowTooltip?: boolean;
+    /**
+     * Límite de caracteres visibles por atributo (antes de agregar "…").
+     * null o undefined = sin límite. @default null
+     */
+    valueMaxChars?: number | null;
   };
 
   /** Estados y textos de mensajes/overlays. */
@@ -343,6 +350,8 @@ export const DEFAULT_SETTINGS: Required<SchemaSettings> = {
     measureExtraWidthPx: 16,
     measureExtraHeightPx: 0,
     enableCollapse: false,
+    valueShowTooltip: false,
+    valueMaxChars: null,
   },
 
   viewport: {
