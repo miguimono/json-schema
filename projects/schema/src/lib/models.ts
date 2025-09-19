@@ -324,7 +324,7 @@ export const DEFAULT_SETTINGS: Required<SchemaSettings> = {
     curveTension: 80,
     straightThresholdDx: 160,
     snapRootChildrenY: false,
-    snapChainSegmentsY: false,
+    snapChainSegmentsY: true,
   },
   dataView: {
     titleKeyPriority: ['name', 'title', 'id', 'label'],

@@ -1,3 +1,5 @@
+Podrias omptimizar de forma mas completa mi readme.md por favor, genera un archivo completo, listo para descargar con toda la informacion relevante de contexto, y un ejemplo de implementacion basica (donde solo envio un Json) y completa donde envio todos los parametros que se tienen
+
 # @miguimono/schema
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)

@@ -78,7 +78,7 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
         (click)="onToggle($event)"
         title="{{ isCollapsed() ? 'Expandir' : 'Colapsar' }}"
       >
-        <span class="chev" [class.collapsed]="isCollapsed()">▾</span>
+        <span class="chev">{{ arrowGlyph() }}</span>
       </button>
 
       <ng-container
@@ -155,6 +155,9 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
         padding: 0;
         line-height: 1;
         z-index: 2;
+        span {
+          font-size: 0.5rem;
+        }
       }
       .chev {
         display: inline-block;
@@ -413,5 +416,27 @@ export class SchemaCardComponent {
    */
   isNoWrapKey(key: string): boolean {
     return this.view().noWrapKeys.includes(key);
+  }
+  /**
+   * Devuelve el glifo del botón colapsar/expandir según:
+   * - Dirección del layout (RIGHT → ◀/▶, DOWN → ▲/▼)
+   * - Estado actual (colapsado = mostrar “expandir”, expandido = mostrar “colapsar”)
+   */
+  arrowGlyph(): string {
+    const dir =
+      this.settings()?.layout?.layoutDirection ??
+      DEFAULT_SETTINGS.layout.layoutDirection;
+    const collapsed = !!this.isCollapsed();
+
+    if (dir === 'DOWN') {
+      // Colapsado → mostrar “expandir hacia abajo” (▼)
+      // Expandido → mostrar “colapsar hacia arriba” (▲)
+      return collapsed ? '▼' : '▲';
+    }
+
+    // RIGHT (por defecto):
+    // Colapsado → mostrar “expandir hacia la derecha” (▶)
+    // Expandido → mostrar “colapsar hacia la izquierda” (◀)
+    return collapsed ? '▶' : '◀';
   }
 }
