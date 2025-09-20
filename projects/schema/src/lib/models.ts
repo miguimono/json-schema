@@ -176,22 +176,20 @@ export interface SchemaSettings {
      * Tensión de curva para linkStyle='curve'. Clamp 20–200.
      * @default 30
      */
+    // Tidy/compacto: curveTension: 30–50
+    // Espacioso/decorativo: curveTension: 80–140
     curveTension?: number;
     /**
      * Umbral horizontal (dx) bajo el cual un enlace 'curve' se dibuja recto.
      * @default 60
      */
+    // Tidy/compacto: straightThresholdDx: 60–100
+    // Espacioso/decorativo: straightThresholdDx: 120–180
     straightThresholdDx?: number;
-    /**
-     * Alinea verticalmente los hijos del root a una misma línea central.
-     * @default false
-     */
-    snapRootChildrenY?: boolean;
-    /**
-     * Alinea cadenas lineales (out=1,in=1) para trazado recto.
-     * @default false
-     */
-    snapChainSegmentsY?: boolean;
+    /** Separación horizontal mínima entre cards (px). @default 64 */
+    columnGapPx?: number;
+    /** Separación vertical mínima entre cards (px). @default 32 */
+    rowGapPx?: number;
   };
 
   /** Cómo extraer/mostrar datos en cards y medición. */
@@ -304,7 +302,7 @@ export interface SchemaSettings {
  * const settings: SchemaSettings = {
  *   ...DEFAULT_SETTINGS,
  *   layout: { ...DEFAULT_SETTINGS.layout, linkStyle: 'orthogonal' },
- *   colors: { ...DEFAULT_SETTINGS.colors, linkStroke: '#00B8A9' }
+ *   colors: { ...DEFAULT_SETTINGS.colors, linkStroke: '#019df4' }
  * };
  * ```
  */
@@ -331,9 +329,8 @@ export const DEFAULT_SETTINGS: Required<SchemaSettings> = {
     layoutAlign: 'firstChild',
     linkStyle: 'curve',
     curveTension: 30,
-    straightThresholdDx: 60,
-    snapRootChildrenY: false,
-    snapChainSegmentsY: true,
+    columnGapPx: 64,
+    rowGapPx: 32,
   },
   dataView: {
     titleKeyPriority: ['name', 'title', 'id', 'label'],

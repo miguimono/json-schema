@@ -23,9 +23,6 @@ type PinMap = Record<string, number>;
 
 @Injectable({ providedIn: 'root' })
 export class SchemaLayoutService {
-  private readonly hGap = 64; // separación entre columnas (RIGHT) o filas (DOWN)
-  private readonly vGap = 20; // separación entre hermanos (eje secundario)
-
   async layout(
     g: NormalizedGraph,
     settings: SchemaSettings = DEFAULT_SETTINGS
@@ -38,9 +35,9 @@ export class SchemaLayoutService {
       'firstChild';
     const linkStyle: LinkStyle = (s.layout?.linkStyle ??
       DEFAULT_SETTINGS.layout.linkStyle)!;
-    const enableSnapChain =
-      s.layout?.snapChainSegmentsY ??
-      DEFAULT_SETTINGS.layout.snapChainSegmentsY;
+    const GAP_X =
+      s.layout?.columnGapPx ?? DEFAULT_SETTINGS.layout.columnGapPx ?? 64;
+    const GAP_Y = s.layout?.rowGapPx ?? DEFAULT_SETTINGS.layout.rowGapPx ?? 32;
 
     // --- índices ---
     const nodesById = new Map<string, SchemaNode>(
@@ -115,7 +112,7 @@ export class SchemaLayoutService {
       let sum = 0;
       for (let i = 0; i < kids.length; i++) {
         sum += measureSubtree(kids[i]);
-        if (i < kids.length - 1) sum += this.vGap;
+        if (i < kids.length - 1) sum += GAP_Y;
       }
       subtreeSize.set(id, sum);
       return sum;
@@ -135,7 +132,7 @@ export class SchemaLayoutService {
     }
     const mainOffset: number[] = new Array(maxDepth + 1).fill(0);
     for (let d = 1; d <= maxDepth; d++) {
-      mainOffset[d] = mainOffset[d - 1] + sizeByDepth[d - 1] + this.hGap;
+      mainOffset[d] = mainOffset[d - 1] + sizeByDepth[d - 1] + GAP_X;
     }
 
     // Pin map
@@ -190,7 +187,7 @@ export class SchemaLayoutService {
             : (cNode.x ?? 0) + getW(cNode) / 2;
         childCenters.push(cCenter);
 
-        cursor += cSize + (i < kids.length - 1 ? this.vGap : 0);
+        cursor += cSize + (i < kids.length - 1 ? GAP_Y : 0);
       }
 
       // Alineación del padre:
@@ -221,46 +218,7 @@ export class SchemaLayoutService {
       const rSize =
         subtreeSize.get(r.id) ?? (dir === 'RIGHT' ? getH(r) : getW(r));
       placeSubtree(r.id, 0, globalCursor);
-      globalCursor += rSize + (i < roots.length - 1 ? this.vGap : 0);
-    }
-
-    // ===== Snap de cadenas lineales (out=1) =====
-    if (enableSnapChain) {
-      // grados
-      const outDeg = new Map<string, number>();
-      const inDeg = new Map<string, number>();
-      for (const n of g.nodes) {
-        outDeg.set(n.id, 0);
-        inDeg.set(n.id, 0);
-      }
-      for (const e of g.edges) {
-        outDeg.set(e.source, (outDeg.get(e.source) ?? 0) + 1);
-        inDeg.set(e.target, (inDeg.get(e.target) ?? 0) + 1);
-      }
-      // para cada nodo con out=1 (y opcionalmente in<=1), alinear su centro al del único hijo
-      for (const n of g.nodes) {
-        const out = outDeg.get(n.id) ?? 0;
-        if (out !== 1) continue;
-        const childId = (childrenById.get(n.id) ?? [])[0];
-        const child = childId ? nodesById.get(childId) : undefined;
-        if (!child) continue;
-
-        if (dir === 'RIGHT') {
-          const cy = (child.y ?? 0) + getH(child) / 2;
-          const ny = cy - getH(n) / 2;
-          if (Math.abs((n.y ?? 0) - ny) > 0) {
-            n.y = Math.round(ny);
-            pin[n.id] = Math.round(cy);
-          }
-        } else {
-          const cx = (child.x ?? 0) + getW(child) / 2;
-          const nx = cx - getW(n) / 2;
-          if (Math.abs((n.x ?? 0) - nx) > 0) {
-            n.x = Math.round(nx);
-            pin[n.id] = Math.round(cx);
-          }
-        }
-      }
+      globalCursor += rSize + (i < roots.length - 1 ? GAP_Y : 0);
     }
 
     // ===== Puntos de aristas =====
