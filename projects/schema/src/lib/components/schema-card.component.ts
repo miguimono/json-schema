@@ -99,7 +99,7 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
           >
             <div *ngFor="let kv of objToPairs(attrs)" class="kv">
               @if (kv[0] != view().accentByKey) {
-              <span class="k">{{ kv[0] }}:</span>
+              <span class="k">{{ displayKey(kv[0]) }}:</span>
               <span
                 class="v"
                 [class.v-true]="kv[1] === true"
@@ -118,7 +118,8 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
           >
             <ng-container *ngFor="let e of objToPairs(arrs)">
               <span class="arr-badge">
-                {{ e[0] }}: {{ e[1] }} {{ e[1] === 1 ? 'item' : 'items' }}
+                {{ displayKey(e[0]) }}: {{ e[1] }}
+                {{ e[1] === 1 ? 'item' : 'items' }}
               </span>
             </ng-container>
           </div>
@@ -314,6 +315,7 @@ export class SchemaCardComponent {
       maxCardWidth: s.dataView?.maxCardWidth ?? null,
       maxCardHeight: s.dataView?.maxCardHeight ?? null,
       noWrapKeys: s.dataView?.noWrapKeys ?? [],
+      labelData: s.dataView?.labelData ?? {},
       valueShowTooltip: s.dataView?.valueShowTooltip ?? false,
       valueMaxChars: s.dataView?.valueMaxChars ?? null,
 
@@ -458,5 +460,12 @@ export class SchemaCardComponent {
   valueTitle(val: any): string | null {
     if (!this.view().valueShowTooltip) return null;
     return val == null ? String(val) : String(val);
+  }
+  /** Devuelve la etiqueta visible para una clave, usando dataView.labelData si existe. */
+  displayKey(key: string): string {
+    const map = this.view().labelData ?? {};
+    return map && Object.prototype.hasOwnProperty.call(map, key)
+      ? map[key]
+      : key;
   }
 }

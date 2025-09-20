@@ -234,6 +234,8 @@ export interface SchemaSettings {
      * @default false
      */
     enableCollapse?: boolean;
+    /** Mapa de traducciones de claves → etiqueta visible. @default {} */
+    labelData?: Record<string, string>;
     /** Mostrar tooltip (title) con el valor completo en los atributos. @default false */
     valueShowTooltip?: boolean;
     /**
@@ -350,6 +352,7 @@ export const DEFAULT_SETTINGS: Required<SchemaSettings> = {
     measureExtraWidthPx: 16,
     measureExtraHeightPx: 0,
     enableCollapse: false,
+    labelData: {},
     valueShowTooltip: false,
     valueMaxChars: null,
   },
