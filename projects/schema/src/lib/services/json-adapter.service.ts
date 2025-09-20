@@ -58,9 +58,6 @@ export class JsonAdapterService {
       DEFAULT_SETTINGS.dataView.treatScalarArraysAsAttribute;
     const previewMaxKeys =
       dv.previewMaxKeys ?? DEFAULT_SETTINGS.dataView.previewMaxKeys;
-    const collapseSingleChildWrappers =
-      dv.collapseSingleChildWrappers ??
-      DEFAULT_SETTINGS.dataView.collapseSingleChildWrappers;
     const defaultNodeSize =
       dv.defaultNodeSize ?? DEFAULT_SETTINGS.dataView.defaultNodeSize;
     const maxDepth = dv.maxDepth ?? DEFAULT_SETTINGS.dataView.maxDepth;
@@ -92,7 +89,7 @@ export class JsonAdapterService {
       obj: any,
       priorities: string[]
     ): { title: string; usedKey?: string } => {
-      if (priorities.length) {
+      if (Array.isArray(priorities) && priorities.length > 0) {
         for (const k of priorities) {
           const v = obj?.[k];
           if (v != null && String(v).trim() !== '') {
@@ -100,12 +97,7 @@ export class JsonAdapterService {
           }
         }
       }
-      const firstScalar = Object.entries(obj ?? {}).find(([_, v]) =>
-        isScalar(v)
-      );
-      if (firstScalar)
-        return { title: String(firstScalar[1]), usedKey: undefined };
-      return { title: 'Item', usedKey: undefined };
+      return { title: '', usedKey: undefined };
     };
 
     /**
@@ -149,31 +141,6 @@ export class JsonAdapterService {
     const isEntity = (obj: any): boolean => {
       if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
       return Object.values(obj).some(isScalar);
-    };
-
-    /**
-     * Determina si un objeto es un "wrapper colapsable":
-     * - Es objeto con único hijo objeto/array no escalar.
-     * - No tiene escalares propios.
-     * - Si está habilitado `collapseSingleChildWrappers`, se colapsa.
-     */
-    const isCollapsibleWrapper = (obj: any): boolean => {
-      if (!collapseSingleChildWrappers) return false;
-      if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
-      if (Object.values(obj).some(isScalar)) return false;
-
-      let objs = 0;
-      for (const v of Object.values(obj)) {
-        if (v && typeof v === 'object') {
-          if (Array.isArray(v)) {
-            if (v.some((x) => x && typeof x === 'object')) objs += 1;
-          } else {
-            objs += 1;
-          }
-        }
-        if (objs > 1) break;
-      }
-      return objs === 1;
     };
 
     /**
@@ -226,7 +193,7 @@ export class JsonAdapterService {
         data: obj,
         jsonMeta: {
           title,
-          attributes: attrs,
+          attributes: buildPreviewAttributes(obj, usedKey),
           childrenCount: 0,
           arrayCounts: arrayCountsOf(obj),
           childOrder,
@@ -273,17 +240,6 @@ export class JsonAdapterService {
       }
 
       if (val && typeof val === 'object') {
-        // Colapso de wrapper
-        if (isCollapsibleWrapper(val)) {
-          for (const [k, v] of Object.entries(val)) {
-            if (v && typeof v === 'object') {
-              traverse(v, `${path}.${k}`, parentId, depth + 1);
-              break;
-            }
-          }
-          return;
-        }
-
         // Entidad → nodo
         let myId = parentId;
         if (isEntity(val)) {

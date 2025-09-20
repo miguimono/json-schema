@@ -357,9 +357,12 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
   private collapsed = new Set<string>();
 
   /** Flag derivado: `settings.dataView.enableCollapse`. */
-  enableCollapse = computed<boolean>(
-    () => !!this.settings()?.dataView?.enableCollapse
-  );
+  enableCollapse = computed<boolean>(() => {
+    const b = this.baseSettings();
+    return (
+      b.dataView?.enableCollapse ?? DEFAULT_SETTINGS.dataView!.enableCollapse!
+    );
+  });
 
   constructor(
     private adapter: JsonAdapterService,

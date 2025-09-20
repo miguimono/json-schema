@@ -198,16 +198,12 @@ export interface SchemaSettings {
     titleKeyPriority?: string[];
     /** Claves globales ocultas en el preview. @default [] */
     hiddenKeysGlobal?: string[];
-    /** Modo de título del template por defecto. @default 'auto' */
+    /** Modo de título del template por defecto. @default 'false' */
     showTitle?: boolean;
     /** Máximo de atributos en preview. @default 4 */
     previewMaxKeys?: number;
     /** Arrays escalares como atributo concatenado. @default true */
     treatScalarArraysAsAttribute?: boolean;
-    /** Colapsar contenedores array envolventes. @default true */
-    collapseArrayContainers?: boolean;
-    /** Colapsar wrappers de único hijo sin escalares. @default true */
-    collapseSingleChildWrappers?: boolean;
     /** Profundidad máxima de recorrido (null = sin límite). @default null */
     maxDepth?: number | null;
     /** Tamaño base por defecto de card. @default { width: 320, height: 96 } */
@@ -329,35 +325,33 @@ export const DEFAULT_SETTINGS: Required<SchemaSettings> = {
     layoutAlign: 'firstChild',
     linkStyle: 'curve',
     curveTension: 30,
+    straightThresholdDx: 60,
     columnGapPx: 64,
     rowGapPx: 32,
   },
-  dataView: {
-    titleKeyPriority: ['name', 'title', 'id', 'label'],
-    hiddenKeysGlobal: [],
-    showTitle: false,
-    previewMaxKeys: 5,
-    treatScalarArraysAsAttribute: true,
-    collapseArrayContainers: true,
-    collapseSingleChildWrappers: true,
-    maxDepth: null,
-    defaultNodeSize: { width: 256, height: 64 },
-    noWrapKeys: [],
-    maxCardWidth: null,
-    maxCardHeight: null,
-    autoResizeCards: true,
-    measureExtraWidthPx: 16,
-    measureExtraHeightPx: 0,
-    enableCollapse: false,
-    labelData: {},
-    valueShowTooltip: false,
-    valueMaxChars: null,
-  },
-
   viewport: {
     height: 800,
     minHeight: 480,
     showToolbar: true,
+  },
+  dataView: {
+    labelData: {},
+    titleKeyPriority: [],
+    hiddenKeysGlobal: [],
+    showTitle: false,
+    enableCollapse: false,
+    previewMaxKeys: 999,
+    valueMaxChars: null,
+    valueShowTooltip: false,
+    treatScalarArraysAsAttribute: false,
+    maxDepth: null,
+    defaultNodeSize: { width: 256, height: 64 },
+    autoResizeCards: true,
+    noWrapKeys: [],
+    maxCardWidth: null,
+    maxCardHeight: null,
+    measureExtraWidthPx: 16,
+    measureExtraHeightPx: 0,
   },
   debug: {
     measure: false,

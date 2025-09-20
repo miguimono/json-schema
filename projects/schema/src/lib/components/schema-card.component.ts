@@ -89,8 +89,11 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
 
       <ng-template #defaultTpl>
         <div class="card-body">
-          <div class="card-title" *ngIf="this.view().showTitle">
-            {{ node()?.jsonMeta?.title || node()?.label }}
+          <div
+            class="card-title"
+            *ngIf="view().showTitle && hasComputedTitle()"
+          >
+            {{ node()?.jsonMeta?.title }}
           </div>
 
           <div
@@ -467,5 +470,9 @@ export class SchemaCardComponent {
     return map && Object.prototype.hasOwnProperty.call(map, key)
       ? map[key]
       : key;
+  }
+  hasComputedTitle(): boolean {
+    const t = this.node()?.jsonMeta?.title;
+    return !!t && String(t).trim() !== '';
   }
 }
