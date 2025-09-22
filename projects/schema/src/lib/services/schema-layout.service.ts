@@ -1,12 +1,5 @@
 // projects/schema/src/lib/services/schema-layout.service.ts
-// ====================================================================
-// SchemaLayoutService (layout "tidy tree" + snap de cadenas lineales)
-// - RIGHT/DOWN con orden estable por jsonMeta.childOrder
-// - layoutAlign: 'firstChild' o 'center'
-// - Sin solapes: cada hermano ocupa el ALTO/ANCHO de su SUBÁRBOL
-// - Snap opcional de cadenas (out=1) a la Y/X del hijo: settings.layout.snapChainSegmentsY
-// - Links: 'orthogonal' => codos; 'curve'/'line' => [start,end] (SchemaLinks dibuja)
-// ====================================================================
+// URL: projects/schema/src/lib/services/schema-layout.service.ts
 
 import { Injectable } from '@angular/core';
 import {
@@ -21,13 +14,37 @@ import {
 
 type PinMap = Record<string, number>;
 
+/**
+ * Servicio de layout tipo “tidy tree” para RIGHT/DOWN.
+ *
+ * Propiedades:
+ * - Mantiene orden estable por `jsonMeta.childOrder`.
+ * - Alineación del padre: 'firstChild' o 'center'.
+ * - Evita solapes: cada hermano ocupa el alto/ancho de su subárbol.
+ * - Calcula puntos de aristas para 'orthogonal' y atajos para 'curve'/'line'.
+ */
 @Injectable({ providedIn: 'root' })
 export class SchemaLayoutService {
+  /**
+   * Calcula posiciones x/y de nodos y puntos de aristas.
+   * @param g Grafo normalizado visible (nodos + aristas).
+   * @param settings Subconjunto de configuración. Si no se indica, usa DEFAULT_SETTINGS.
+   * @returns Grafo con posiciones aplicadas y puntos de aristas.
+   *
+   * Ejemplo:
+   * ```ts
+   * const laid = await layoutService.layout(graph, {
+   *   layout: { layoutDirection: 'RIGHT', linkStyle: 'orthogonal' }
+   * });
+   * ```
+   */
   async layout(
     g: NormalizedGraph,
     settings: SchemaSettings = DEFAULT_SETTINGS
   ): Promise<NormalizedGraph> {
     const s = this.mergeSettings(settings);
+
+    // --- Lectura de parámetros efectivos ---
     const dir: LayoutDirection = (s.layout?.layoutDirection ??
       DEFAULT_SETTINGS.layout.layoutDirection)!;
     const alignFirstChild =
@@ -35,11 +52,12 @@ export class SchemaLayoutService {
       'firstChild';
     const linkStyle: LinkStyle = (s.layout?.linkStyle ??
       DEFAULT_SETTINGS.layout.linkStyle)!;
-    const GAP_X =
-      s.layout?.columnGapPx ?? DEFAULT_SETTINGS.layout.columnGapPx ?? 64;
-    const GAP_Y = s.layout?.rowGapPx ?? DEFAULT_SETTINGS.layout.rowGapPx ?? 32;
 
-    // --- índices ---
+    const GAP_X =
+      s.layout?.columnGapPx ?? DEFAULT_SETTINGS.layout.columnGapPx ?? 0;
+    const GAP_Y = s.layout?.rowGapPx ?? DEFAULT_SETTINGS.layout.rowGapPx ?? 0;
+
+    // --- Índices padres/hijos ---
     const nodesById = new Map<string, SchemaNode>(
       g.nodes.map((n) => [n.id, n])
     );
@@ -55,7 +73,7 @@ export class SchemaLayoutService {
       if (parentsById.has(e.target)) parentsById.get(e.target)!.push(e.source);
     }
 
-    // Orden estable de hijos por childOrder
+    // Orden estable por childOrder (fallback por id para desempate)
     for (const [pid, arr] of childrenById) {
       arr.sort((aId, bId) => {
         const a = nodesById.get(aId);
@@ -71,7 +89,7 @@ export class SchemaLayoutService {
       (n) => (parentsById.get(n.id)?.length ?? 0) === 0
     );
 
-    // Profundidad por BFS
+    // Profundidad por BFS (para offsets por capa)
     const depthById = new Map<string, number>();
     const q = [...roots];
     for (const r of roots) depthById.set(r.id, 0);
@@ -87,19 +105,25 @@ export class SchemaLayoutService {
       }
     }
 
-    // Medidas seguras
+    // Medidas seguras por nodo (usa defaultNodeSize si faltan width/height)
     const getW = (n: SchemaNode) =>
       Math.max(
         1,
-        n.width ?? DEFAULT_SETTINGS.dataView?.defaultNodeSize?.width ?? 220
+        n.width ??
+          (DEFAULT_SETTINGS.dataView.defaultNodeSize
+            ? DEFAULT_SETTINGS.dataView.defaultNodeSize.width
+            : 1)
       );
     const getH = (n: SchemaNode) =>
       Math.max(
         1,
-        n.height ?? DEFAULT_SETTINGS.dataView?.defaultNodeSize?.height ?? 96
+        n.height ??
+          (DEFAULT_SETTINGS.dataView.defaultNodeSize
+            ? DEFAULT_SETTINGS.dataView.defaultNodeSize.height
+            : 1)
       );
 
-    // Tamaño del subárbol (RIGHT => alto; DOWN => ancho)
+    // Tamaño de subárbol en eje secundario (RIGHT => alto; DOWN => ancho)
     const subtreeSize = new Map<string, number>();
     const measureSubtree = (id: string): number => {
       const node = nodesById.get(id)!;
@@ -135,25 +159,21 @@ export class SchemaLayoutService {
       mainOffset[d] = mainOffset[d - 1] + sizeByDepth[d - 1] + GAP_X;
     }
 
-    // Pin map
+    // Meta pin (Y para RIGHT, X para DOWN)
     const meta = g.meta ?? {};
     const pinKey = dir === 'RIGHT' ? 'pinY' : 'pinX';
     if (!meta[pinKey]) meta[pinKey] = {};
     const pin: PinMap = meta[pinKey] as PinMap;
 
-    // Posicionamiento tipo "tidy"
+    // Posicionamiento recursivo
     const placeSubtree = (id: string, depth: number, start: number): number => {
-      // start = inicio del bloque del subárbol sobre el eje secundario (y en RIGHT / x en DOWN)
       const node = nodesById.get(id)!;
       const kids = childrenById.get(id) ?? [];
       const mySize =
         subtreeSize.get(id) ?? (dir === 'RIGHT' ? getH(node) : getW(node));
-
-      // Eje principal (x en RIGHT, y en DOWN)
       const mainPos = mainOffset[depth] ?? 0;
 
       if (kids.length === 0) {
-        // Hoja: centrar su propia card dentro del bloque "mySize"
         const centerSec = start + mySize / 2;
         if (dir === 'RIGHT') {
           node.x = Math.round(mainPos);
@@ -167,20 +187,17 @@ export class SchemaLayoutService {
         return mySize;
       }
 
-      // Colocar hijos en cascada (por childOrder); guardamos el CENTRO DE LA CARD de cada hijo
+      // Colocar hijos y recoger centros de card de cada hijo
       let cursor = start;
       const childCenters: number[] = [];
-
       for (let i = 0; i < kids.length; i++) {
         const cid = kids[i];
         const cNode = nodesById.get(cid)!;
         const cSize =
           subtreeSize.get(cid) ?? (dir === 'RIGHT' ? getH(cNode) : getW(cNode));
 
-        // Colocamos primero el subárbol del hijo (asigna x/y al hijo)
         placeSubtree(cid, depth + 1, cursor);
 
-        // Ahora tomamos el centro de la **CARD** del hijo (no del subárbol)
         const cCenter =
           dir === 'RIGHT'
             ? (cNode.y ?? 0) + getH(cNode) / 2
@@ -190,9 +207,7 @@ export class SchemaLayoutService {
         cursor += cSize + (i < kids.length - 1 ? GAP_Y : 0);
       }
 
-      // Alineación del padre:
-      // - firstChild → centro de la card del PRIMER hijo
-      // - center     → promedio de los centros de las cards de los hijos
+      // Alineación del padre respecto a los hijos
       const targetCenter = alignFirstChild
         ? childCenters[0]
         : childCenters.reduce((a, b) => a + b, 0) /
@@ -208,11 +223,11 @@ export class SchemaLayoutService {
         pin[node.id] = Math.round(targetCenter);
       }
 
-      return mySize; // alto/ancho consumido por el subárbol de este nodo
+      return mySize;
     };
 
-    // Distribuir raíces (con pequeño padding superior para evitar “pegado” arriba)
-    let globalCursor = 40; // padding superior
+    // Distribuir raíces con un padding superior
+    let globalCursor = 40;
     for (let i = 0; i < roots.length; i++) {
       const r = roots[i];
       const rSize =
@@ -221,7 +236,7 @@ export class SchemaLayoutService {
       globalCursor += rSize + (i < roots.length - 1 ? GAP_Y : 0);
     }
 
-    // ===== Puntos de aristas =====
+    // Puntos de aristas según dirección y estilo
     const edges: SchemaEdge[] = g.edges.map((e) => {
       const a = nodesById.get(e.source);
       const b = nodesById.get(e.target);
@@ -232,6 +247,7 @@ export class SchemaLayoutService {
         const ay = (a.y ?? 0) + Math.round(getH(a) / 2);
         const bx = b.x ?? 0;
         const by = (b.y ?? 0) + Math.round(getH(b) / 2);
+
         if (linkStyle === 'orthogonal') {
           const midX = Math.round((ax + bx) / 2);
           return {
@@ -244,6 +260,7 @@ export class SchemaLayoutService {
             ],
           };
         }
+        // curve/line → dos puntos (SchemaLinks decide la forma final)
         return {
           ...e,
           points: [
@@ -256,6 +273,7 @@ export class SchemaLayoutService {
         const ay = (a.y ?? 0) + getH(a);
         const bx = (b.x ?? 0) + Math.round(getW(b) / 2);
         const by = b.y ?? 0;
+
         if (linkStyle === 'orthogonal') {
           const midY = Math.round((ay + by) / 2);
           return {
@@ -285,6 +303,7 @@ export class SchemaLayoutService {
     };
   }
 
+  /** Fusiona settings parciales con DEFAULT_SETTINGS por sección. */
   private mergeSettings(s: SchemaSettings): Required<SchemaSettings> {
     return {
       colors: { ...DEFAULT_SETTINGS.colors, ...(s.colors ?? {}) },

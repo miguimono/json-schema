@@ -1,304 +1,254 @@
 // projects/schema/src/lib/models.ts
-// =======================================================
-// Definiciones de modelo para la librería Schema, sin SchemaOptions
-// (se reemplaza por SchemaSettings + DEFAULT_SETTINGS).
-// =======================================================
+// URL: projects/schema/src/lib/models.ts
 
 /**
- * Dirección de layout del grafo.
- * - 'RIGHT': flujo de izquierda → derecha.
- * - 'DOWN':  flujo de arriba → abajo.
+ * Dirección del layout del grafo.
+ * - 'RIGHT': flujo izquierda → derecha.
+ * - 'DOWN':  flujo arriba → abajo.
  */
-export type LayoutDirection = 'RIGHT' | 'DOWN';
+export type LayoutDirection = "RIGHT" | "DOWN";
 
 /**
- * Alineación del padre con respecto a sus hijos.
- * - 'firstChild': centra al padre con el primer hijo (según jsonMeta.childOrder).
- * - 'center':     centra al padre con el promedio vertical de sus hijos.
+ * Alineación del padre respecto a sus hijos.
+ * - 'firstChild': centro del padre alineado con el primer hijo (orden JSON).
+ * - 'center':     centro del padre alineado con el promedio de los hijos.
  */
-export type LayoutAlign = 'firstChild' | 'center';
+export type LayoutAlign = "firstChild" | "center";
 
 /**
  * Estilo visual de las aristas.
- * - 'orthogonal': segmentos en L (ruteo ortogonal).
- * - 'curve':      curva cúbica con puntos de control laterales.
- * - 'line':       recta simple entre origen y destino.
+ * - 'orthogonal': segmentos tipo “L”.
+ * - 'curve':      curva cúbica.
+ * - 'line':       recta simple.
  */
-export type LinkStyle = 'curve' | 'orthogonal' | 'line';
+export type LinkStyle = "curve" | "orthogonal" | "line";
 
-/**
- * Nodo del grafo normalizado.
- * Generado por {@link JsonAdapterService} y posicionado por {@link SchemaLayoutService}.
- */
+/** Nodo del grafo normalizado. */
 export interface SchemaNode {
-  /**
-   * Identificador único del nodo.
-   * @example "$.central.cables[0]"
-   * @remarks Por defecto se usa la ruta JSON (jsonPath) como id estable.
-   */
+  /** Identificador único (ruta JSON estable). */
   id: string;
-
-  /**
-   * Etiqueta principal del nodo (título visible en la card).
-   * @default Seleccionado con heurística de título (ver jsonMeta.title)
-   */
+  /** Etiqueta visible principal. */
   label: string;
-
-  /**
-   * Ruta JSON origen del nodo.
-   * Útil para debugging, deep-linking y plantillas personalizadas.
-   */
+  /** Ruta JSON origen del nodo. */
   jsonPath: string;
-
-  /**
-   * Objeto original asociado (para uso en plantillas).
-   * @remarks Se recomienda no mutar este objeto desde la UI.
-   */
+  /** Objeto original (no mutar desde UI). */
   data: Record<string, any>;
-
-  /**
-   * Metadatos calculados durante la normalización.
-   * - title: título sugerido (usado por defecto si showTitle === true).
-   * - attributes: preview de pares clave/valor (escalares y arrays escalares).
-   * - childrenCount: número de hijos directos en el grafo.
-   * - arrayCounts: tamaños de arrays no escalares por clave.
-   * - childOrder: índice relativo entre hermanos (para orden estable).
-   */
+  /** Metadatos calculados durante la normalización. */
   jsonMeta?: {
     /** Título sugerido para la card. */
     title?: string;
     /** Atributos de vista previa (clave/valor). */
     attributes?: Record<string, any>;
-    /** Número de hijos directos del nodo. */
+    /** Número de hijos directos. */
     childrenCount?: number;
-    /** Conteo de arrays no escalares por clave. */
+    /** Tamaños de arrays no escalares por clave. */
     arrayCounts?: Record<string, number>;
-    /** Posición relativa del nodo respecto a sus hermanos. */
+    /** Orden relativo entre hermanos. */
     childOrder?: number;
   };
-
-  /**
-   * Posición y tamaño asignados por el layout/medición.
-   * @remarks Estos valores pueden refinarse tras medición de DOM si autoResizeCards=true.
-   */
+  /** Posición y tamaño (se actualizan tras layout y medición). */
   x?: number;
   y?: number;
   width?: number;
   height?: number;
 }
 
-/**
- * Arista del grafo normalizado. Une dos nodos por sus IDs.
- * Los puntos de dibujo (polyline/curva) se calculan tras el layout.
- */
+/** Arista entre dos nodos del grafo. */
 export interface SchemaEdge {
-  /** Identificador único del edge. */
   id: string;
-
-  /** ID del nodo origen. */
   source: string;
-
-  /** ID del nodo destino. */
   target: string;
-
-  /** Etiqueta opcional (no usada por defecto en el render). */
   label?: string;
-
-  /**
-   * Puntos del path SVG en coordenadas del grafo.
-   * - orthogonal: start, bends, end.
-   * - curve/line: típicamente [start, (c1), (c2), end] o [start, end].
-   */
+  /** Puntos del path SVG en coordenadas del grafo. */
   points?: Array<{ x: number; y: number }>;
 }
 
-/**
- * Estructura del grafo normalizado (nodos + aristas) con metadatos auxiliares.
- */
+/** Contenedor de nodos, aristas y metadatos auxiliares. */
 export interface NormalizedGraph {
-  /** Lista de nodos del grafo. */
   nodes: SchemaNode[];
-
-  /** Lista de aristas del grafo. */
   edges: SchemaEdge[];
-
-  /**
-   * Metadatos auxiliares del grafo.
-   * @example
-   *  meta.pinY: Record<nodeId, y> para fijar verticalmente ciertos hijos al relayout.
-   */
   meta?: Record<string, any>;
 }
 
 /**
- * Contenedor de settings por secciones.
- * Si no se especifica alguna sección/prop, se aplican defaults desde {@link DEFAULT_SETTINGS}.
+ * Configuración por secciones (mergeable con DEFAULT_SETTINGS).
  *
- * @example Activar enlaces curvos y acento por booleano
- * ```ts
- * const settings: SchemaSettings = {
- *   colors: { linkStroke: '#019df4', linkStrokeWidth: 2, accentByKey: 'certified' },
- *   layout: { linkStyle: 'curve', layoutAlign: 'center' },
- *   dataView: { enableCollapse: true }
- * };
- * ```
+ * Organización:
+ * - messages  → estados/textos de overlays.
+ * - colors    → color de aristas y acentos de cards.
+ * - layout    → dirección, alineación y estilo de enlaces.
+ * - dataView  → extracción/presentación de datos en cards + medición.
+ * - viewport  → alto del visor, toolbar y visibilidad de controles.
+ * - debug     → trazas y ayudas de depuración.
  */
 export interface SchemaSettings {
+  /** Estados y textos de overlays. */
+  messages?: {
+    isLoading?: boolean;
+    isError?: boolean;
+    loadingMessage?: string;
+    errorMessage?: string;
+    emptyMessage?: string;
+  };
+
   /** Colores y acentos. */
   colors?: {
-    /** Color de aristas (stroke). @default '#019df4' */
+    /** Stroke de enlaces. */
     linkStroke?: string;
-    /** Grosor del trazo de aristas. @default 2 */
+    /** Grosor del stroke de enlaces. */
     linkStrokeWidth?: number;
-    /** Clave booleana para acentuar cards (true/false/null). @default null */
+
+    /** Clave booleana del objeto para acentuar cards (true/false/null). */
     accentByKey?: string | null;
-    /** Aplica fondo de acento además del borde. @default false */
-    accentFill?: boolean;
-    /** Invierte mapping de colores (true↔false). @default false */
+    /** Intercambia la semántica de colores true/false. */
     accentInverse?: boolean;
-    /** Muestra color cuando v===true. @default false */
+    /** Aplica color de fondo además del borde. */
+    accentFill?: boolean;
+
+    /** Controla si se colorea cuando el valor es true. */
     showColorTrue?: boolean;
-    /** Muestra color cuando v===false. @default false */
+    /** Controla si se colorea cuando el valor es false. */
     showColorFalse?: boolean;
-    /** Muestra color cuando v===null. @default false */
+    /** Controla si se colorea cuando el valor es null. */
     showColorNull?: boolean;
   };
 
-  /** Parámetros visuales del layout y ruteo. */
+  /** Parámetros de layout y ruteo. */
   layout?: {
-    /** Dirección del layout general. @default 'RIGHT' */
+    /** Dirección del layout general. */
     layoutDirection?: LayoutDirection;
-    /** Alineación padre ↔ hijos. @default 'center' */
+    /** Alineación del padre con los hijos. */
     layoutAlign?: LayoutAlign;
-    /** Estilo de arista. @default 'curve' */
+
+    /** Estilo de arista. */
     linkStyle?: LinkStyle;
-    /**
-     * Tensión de curva para linkStyle='curve'. Clamp 20–200.
-     * @default 30
-     */
-    // Tidy/compacto: curveTension: 30–50
-    // Espacioso/decorativo: curveTension: 80–140
+
+    /** Tensión de curva (20–200) para linkStyle='curve'. */
     curveTension?: number;
     /**
-     * Umbral horizontal (dx) bajo el cual un enlace 'curve' se dibuja recto.
-     * @default 60
+     * Umbral horizontal bajo el cual se dibuja recto aunque linkStyle='curve'.
+     * Evita “curvas cortas” visualmente extrañas.
      */
-    // Tidy/compacto: straightThresholdDx: 60–100
-    // Espacioso/decorativo: straightThresholdDx: 120–180
     straightThresholdDx?: number;
-    /** Separación horizontal mínima entre cards (px). @default 64 */
+
+    /** Separación horizontal mínima entre cards (px). */
     columnGapPx?: number;
-    /** Separación vertical mínima entre cards (px). @default 32 */
+    /** Separación vertical mínima entre cards (px). */
     rowGapPx?: number;
   };
 
-  /** Cómo extraer/mostrar datos en cards y medición. */
+  /**
+   * Extracción y presentación de datos en cards + medición/autoajuste.
+   *
+   * Subgrupos:
+   * a) Extracción de datos
+   * b) Presentación
+   * c) Interacción por nodo
+   * d) Medición y autoajuste
+   */
   dataView?: {
-    /** Prioridad de claves para derivar título. @default ['name','title','id','label'] */
+    // a) Extracción de datos (qué se muestra)
+    /** Prioridad de claves para derivar el título. */
     titleKeyPriority?: string[];
-    /** Claves globales ocultas en el preview. @default [] */
+    /** Claves globales a ocultar en el preview. */
     hiddenKeysGlobal?: string[];
-    /** Modo de título del template por defecto. @default 'false' */
-    showTitle?: boolean;
-    /** Máximo de atributos en preview. @default 4 */
-    previewMaxKeys?: number;
-    /** Arrays escalares como atributo concatenado. @default true */
+    /**
+     * Muestra arrays de escalares como atributo concatenado.
+     * @default true
+     * @example
+     * // tags: ["red","green","blue"] -> "red, green, blue"
+     */
     treatScalarArraysAsAttribute?: boolean;
-    /** Profundidad máxima de recorrido (null = sin límite). @default null */
+
+    /** Profundidad máxima de recorrido (null = sin límite). */
     maxDepth?: number | null;
-    /** Tamaño base por defecto de card. @default { width: 320, height: 96 } */
-    defaultNodeSize?: { width: number; height: number };
-    /** Claves que no deben hacer wrap. @default [] */
-    noWrapKeys?: string[];
-    /** Ancho máximo de card. @default null (sin límite) */
-    maxCardWidth?: number | null;
-    /** Alto máximo de card. @default null (sin límite) */
-    maxCardHeight?: number | null;
-    /** Medir DOM y relayout hasta estabilizar. @default true */
-    autoResizeCards?: boolean;
-    /** Colchón extra en ancho al medir. @default 24 */
-    measureExtraWidthPx?: number;
-    /** Colchón extra en alto al medir. @default 0 */
-    measureExtraHeightPx?: number;
-
-    /**
-     * Habilita el botón de colapso/expansión por card (si tiene hijos).
-     * - true: se muestran controles y funciona el colapso por ancestros.
-     * - false/undefined: no se muestra ningún control (comportamiento anterior).
-     * @default false
-     */
-    enableCollapse?: boolean;
-    /** Mapa de traducciones de claves → etiqueta visible. @default {} */
+    /** Mapa de traducciones de claves → etiqueta visible. */
     labelData?: Record<string, string>;
-    /** Mostrar tooltip (title) con el valor completo en los atributos. @default false */
-    valueShowTooltip?: boolean;
-    /**
-     * Límite de caracteres visibles por atributo (antes de agregar "…").
-     * null o undefined = sin límite. @default null
-     */
-    valueMaxChars?: number | null;
-  };
 
-  /** Estados y textos de mensajes/overlays. */
-  messages?: {
-    /** Modo cargando (overlay). @default false */
-    isLoading?: boolean;
-    /** Modo error (overlay). @default false */
-    isError?: boolean;
-    /** Mensaje para estado vacío. @default 'No hay datos para mostrar' */
-    emptyMessage?: string;
-    /** Mensaje de carga. @default 'Cargando…' */
-    loadingMessage?: string;
-    /** Mensaje de error. @default 'Error al cargar el esquema' */
-    errorMessage?: string;
+    // b) Presentación (cómo se ve)
+    /** Muestra el título sugerido en la card por defecto. */
+    showTitle?: boolean;
+    /** Máximo de atributos en preview. */
+    previewMaxKeys?: number;
+    /** Límite de caracteres visibles por valor (añade "…" si supera). */
+    valueMaxChars?: number | null;
+    /** Muestra tooltip con el valor completo. */
+    valueShowTooltip?: boolean;
+    /** Claves que no deben hacer wrap en la card. */
+    noWrapKeys?: string[];
+
+    /** Límite de ancho por card (px). null = sin límite. */
+    maxCardWidth?: number | null;
+    /** Límite de alto por card (px). null = sin límite. */
+    maxCardHeight?: number | null;
+    /** Tamaño base por defecto de card. */
+    defaultNodeSize?: { width: number; height: number };
+
+    // c) Interacción/feature flags del nodo
+    /** Habilita botón de colapso/expansión por card (si tiene hijos). */
+    enableCollapse?: boolean;
+
+    // d) Medición y autoajuste (afinamiento tras render)
+    /**
+     * Si true, mide el DOM y realinea hasta estabilizar tamaños.
+     * Útil para templates custom o textos variables.
+     */
+    autoResizeCards?: boolean;
+    /** Margen extra de ancho a sumar tras la medición (px). */
+    paddingWidthPx?: number;
+    /** Margen extra de alto a sumar tras la medición (px). */
+    paddingHeightPx?: number;
   };
 
   /** Vista/viewport del esquema. */
   viewport?: {
-    /**
-     * Altura del viewport del esquema (px).
-     * @default 800
-     */
+    /** Altura del viewport (px). */
     height?: number;
-
-    /**
-     * Altura mínima del viewport (px).
-     * @default 480
-     */
+    /** Altura mínima del viewport (px). */
     minHeight?: number;
+    /** Muestra la toolbar integrada. */
+    showToolbar?: boolean;
 
     /**
-     * Muestra la toolbar integrada.
-     * @default true
+     * Visibilidad de controles de la toolbar (todos true por defecto).
+     * Controla la presencia de los selectores de:
+     * - estilo de enlace (linkStyle)
+     * - alineación (layoutAlign)
+     * - dirección (layoutDirection)
      */
-    showToolbar?: boolean;
+    toolbarControls?: {
+      showLinkStyle?: boolean;
+      showLayoutAlign?: boolean;
+      showLayoutDirection?: boolean;
+    };
   };
 
   /** Flags de depuración. */
   debug?: {
-    /** Log de medición. @default false */
+    /** Log de medición. */
     measure?: boolean;
-    /** Log de layout/relayout. @default false */
+    /** Log de layout/relayout. */
     layout?: boolean;
-    /** Dibuja bounds de cards. @default false */
+    /** Dibuja bounds de cards. */
     paintBounds?: boolean;
-    /** Expone `schemaDebug` en window. @default false */
+    /** Expone `schemaDebug` en window. */
     exposeOnWindow?: boolean;
   };
 }
 
 /**
- * Valores por defecto seguros (por secciones) para renderizar y medir el grafo.
- * Usa este objeto como base y combina con tus propios `SchemaSettings`.
+ * Valores por defecto seguros.
  *
- * @example
+ * Ejemplo de uso:
  * ```ts
- * import { DEFAULT_SETTINGS, SchemaSettings } from '@miguimono/schema';
- *
  * const settings: SchemaSettings = {
  *   ...DEFAULT_SETTINGS,
  *   layout: { ...DEFAULT_SETTINGS.layout, linkStyle: 'orthogonal' },
- *   colors: { ...DEFAULT_SETTINGS.colors, linkStroke: '#019df4' }
+ *   dataView: {
+ *     ...DEFAULT_SETTINGS.dataView,
+ *     showTitle: true,
+ *     titleKeyPriority: ['name','title','id']
+ *   }
  * };
  * ```
  */
@@ -306,53 +256,70 @@ export const DEFAULT_SETTINGS: Required<SchemaSettings> = {
   messages: {
     isLoading: false,
     isError: false,
-    emptyMessage: 'No hay datos para mostrar',
-    loadingMessage: 'Cargando…',
-    errorMessage: 'Error al cargar el esquema',
+    loadingMessage: "Cargando…",
+    errorMessage: "Error al cargar el esquema",
+    emptyMessage: "No hay datos para mostrar",
   },
+
   colors: {
-    linkStroke: '#019df4',
+    linkStroke: "#019df4",
     linkStrokeWidth: 2,
     accentByKey: null,
-    accentFill: false,
     accentInverse: false,
+    accentFill: false,
     showColorTrue: false,
     showColorFalse: false,
     showColorNull: false,
   },
+
   layout: {
-    layoutDirection: 'RIGHT',
-    layoutAlign: 'firstChild',
-    linkStyle: 'curve',
+    layoutDirection: "RIGHT",
+    layoutAlign: "firstChild",
+    linkStyle: "curve",
     curveTension: 30,
     straightThresholdDx: 60,
     columnGapPx: 64,
     rowGapPx: 32,
   },
+
+  dataView: {
+    // a) Extracción
+    titleKeyPriority: [],
+    hiddenKeysGlobal: [],
+    treatScalarArraysAsAttribute: true,
+    maxDepth: null,
+    labelData: {},
+
+    // b) Presentación
+    showTitle: false,
+    previewMaxKeys: 999,
+    valueMaxChars: null,
+    valueShowTooltip: false,
+    noWrapKeys: [],
+    maxCardWidth: null,
+    maxCardHeight: null,
+    defaultNodeSize: { width: 256, height: 64 },
+
+    // c) Interacción
+    enableCollapse: false,
+
+    // d) Medición
+    autoResizeCards: true,
+    paddingWidthPx: 16,
+    paddingHeightPx: 0,
+  },
+
   viewport: {
     height: 800,
     minHeight: 480,
     showToolbar: true,
+    toolbarControls: {
+      showLinkStyle: true,
+      showLayoutAlign: true,
+      showLayoutDirection: true,
+    },
   },
-  dataView: {
-    labelData: {},
-    titleKeyPriority: [],
-    hiddenKeysGlobal: [],
-    showTitle: false,
-    enableCollapse: false,
-    previewMaxKeys: 999,
-    valueMaxChars: null,
-    valueShowTooltip: false,
-    treatScalarArraysAsAttribute: false,
-    maxDepth: null,
-    defaultNodeSize: { width: 256, height: 64 },
-    autoResizeCards: true,
-    noWrapKeys: [],
-    maxCardWidth: null,
-    maxCardHeight: null,
-    measureExtraWidthPx: 16,
-    measureExtraHeightPx: 0,
-  },
+
   debug: {
     measure: false,
     layout: false,

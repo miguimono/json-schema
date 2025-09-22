@@ -1,14 +1,5 @@
 // projects/schema/src/lib/components/schema.component.ts
-// ----------------------------------------------------
-// Versión sin SchemaOptions: usa SchemaSettings + DEFAULT_SETTINGS.
-// - enableCollapse: settings.dataView.enableCollapse (false por defecto).
-// - Orden estable de JSON, anti-solapes por capa y pinY conservado (lo hace SchemaLayoutService).
-// - Pipeline: normalize → indices → (subgrafo visible) → layout → medir/relayout → fit-to-view.
-// - Toolbar (linkStyle/layoutAlign) sobreescribe settings.layout sin mutarlo.
-//
-// Requisitos colaterales:
-// - JsonAdapterService.normalize debe aceptar Partial<SchemaSettings> o mapear settings→options internamente.
-// - SchemaLinksComponent y SchemaCardComponent deben aceptar `settings` (no `options`).
+// URL: projects/schema/src/lib/components/schema.component.ts
 
 import {
   AfterViewInit,
@@ -36,6 +27,9 @@ import {
   SchemaNode,
   SchemaSettings,
   DEFAULT_SETTINGS,
+  LinkStyle,
+  LayoutAlign,
+  LayoutDirection,
 } from '../models';
 
 import { SchemaCardComponent } from './schema-card.component';
@@ -64,19 +58,19 @@ import { SchemaLinksComponent } from './schema-links.component';
       [style.height.px]="viewportHeight()"
       [style.minHeight.px]="minViewportHeight()"
     >
-      <!-- ===== Toolbar (opcional) ===== -->
+      <!-- ===== Toolbar ===== -->
       <div
         class="schema-toolbar"
         *ngIf="showToolbar() && !isLoadingView() && !isErrorView()"
       >
-        <div class="left">
+        <div class="toolbar-actions">
           <button type="button" (click)="zoomOut()" title="Zoom out">−</button>
           <button type="button" (click)="zoomIn()" title="Zoom in">+</button>
           <button type="button" (click)="resetView()" title="Centrar">⤾</button>
         </div>
 
-        <div class="right">
-          <label>
+        <div class="toolbar-selectors">
+          <label *ngIf="toolbarShowLinkStyle()">
             Enlaces:
             <select
               #ls
@@ -89,7 +83,7 @@ import { SchemaLinksComponent } from './schema-links.component';
             </select>
           </label>
 
-          <label>
+          <label *ngIf="toolbarShowLayoutAlign()">
             Alineación:
             <select
               #la
@@ -98,6 +92,18 @@ import { SchemaLinksComponent } from './schema-links.component';
             >
               <option value="firstChild">Superior</option>
               <option value="center">Centrado</option>
+            </select>
+          </label>
+
+          <label *ngIf="toolbarShowLayoutDirection()">
+            Dirección:
+            <select
+              #ld
+              [value]="opt_layoutDirection()"
+              (change)="setLayoutDirection(ld.value)"
+            >
+              <option value="RIGHT">Derecha</option>
+              <option value="DOWN">Abajo</option>
             </select>
           </label>
         </div>
@@ -116,9 +122,7 @@ import { SchemaLinksComponent } from './schema-links.component';
       </div>
 
       <div class="overlay error" *ngIf="!isLoadingView() && isErrorView()">
-        <div class="error-banner">
-          {{ errorMessageView() }}
-        </div>
+        <div class="error-banner">{{ errorMessageView() }}</div>
       </div>
 
       <!-- ===== Stage ===== -->
@@ -165,17 +169,22 @@ import { SchemaLinksComponent } from './schema-links.component';
         position: absolute;
         inset: 12px 12px auto 12px;
         z-index: 20;
-        display: flex;
-        justify-content: space-between;
+        display: grid;
+        grid-template-columns: 1fr auto;
         align-items: center;
-        gap: 8px;
+        gap: 8px 12px;
         background: rgba(255, 255, 255, 0.9);
         border: 1px solid rgba(0, 0, 0, 0.06);
         border-radius: 10px;
-        padding: 6px 10px;
+        padding: 8px 12px;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
       }
-      .schema-toolbar button {
+      .toolbar-actions {
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .toolbar-actions button {
         min-width: 32px;
         height: 32px;
         border-radius: 8px;
@@ -185,7 +194,13 @@ import { SchemaLinksComponent } from './schema-links.component';
         line-height: 1;
         cursor: pointer;
       }
-      .schema-toolbar select {
+      .toolbar-selectors {
+        display: inline-flex;
+        gap: 10px;
+        align-items: center;
+        justify-content: flex-end;
+      }
+      .toolbar-selectors select {
         height: 28px;
         border-radius: 6px;
         border: 1px solid rgba(0, 0, 0, 0.12);
@@ -193,11 +208,41 @@ import { SchemaLinksComponent } from './schema-links.component';
         padding: 0 6px;
         cursor: pointer;
       }
-      .schema-toolbar .left,
-      .schema-toolbar .right {
-        display: inline-flex;
-        gap: 8px;
-        align-items: center;
+
+      /* Responsive: <=768px acciones arriba, selectores abajo */
+      @media (max-width: 768px) {
+        .schema-toolbar {
+          grid-template-columns: 1fr;
+          grid-auto-rows: auto;
+        }
+        .toolbar-actions {
+          order: 1;
+          justify-content: flex-start;
+        }
+        .toolbar-selectors {
+          order: 2;
+          justify-content: stretch;
+          flex-wrap: wrap;
+          gap: 8px 10px;
+        }
+      }
+
+      /* Responsive: <=600px selectores en columna */
+      @media (max-width: 600px) {
+        .toolbar-selectors {
+          flex-direction: column;
+          align-items: stretch;
+          gap: 8px;
+        }
+        .toolbar-selectors label {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+        }
+        .toolbar-selectors select {
+          width: 100%;
+        }
       }
 
       .stage {
@@ -208,6 +253,7 @@ import { SchemaLinksComponent } from './schema-links.component';
         height: 6000px;
         transform-origin: 0 0;
       }
+
       /* Overlays */
       .overlay {
         position: absolute;
@@ -274,32 +320,23 @@ import { SchemaLinksComponent } from './schema-links.component';
 })
 export class SchemaComponent implements AfterViewInit, OnChanges {
   // ===== Inputs =====
-
-  /** JSON de entrada a visualizar. */
   data = input<any>();
-
-  /**
-   * Settings por secciones. Se fusionan con DEFAULT_SETTINGS y con las
-   * sobreescrituras de la toolbar (linkStyle/layoutAlign).
-   */
   settings = input<SchemaSettings | null>(null);
-
-  /** Template de card custom (opcional). Recibe el nodo como `$implicit`. */
   cardTemplate = input<TemplateRef<any> | null>(null);
 
-  // Estados/overlays (pueden venir por settings.messages también)
+  // Overlays
   isLoading = input<boolean>(false);
   isError = input<boolean>(false);
   emptyMessage = input<string>('No hay datos para mostrar');
   loadingMessage = input<string>('Cargando…');
   errorMessage = input<string>('Error al cargar el esquema');
 
-  // Viewport (pueden venir por settings.viewport)
+  // Viewport
   viewportHeight = signal<number>(800);
   minViewportHeight = signal<number>(480);
   showToolbar = signal<boolean>(true);
 
-  // ===== Salidas =====
+  // ===== Outputs =====
   @Output() nodeClick = new EventEmitter<SchemaNode>();
   @Output() linkClick = new EventEmitter<SchemaEdge>();
 
@@ -330,11 +367,12 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
   private lastX = 0;
   private lastY = 0;
 
-  // ===== Toolbar (overrides de layout visual) =====
-  opt_linkStyle = signal<'orthogonal' | 'curve' | 'line'>('orthogonal');
-  opt_layoutAlign = signal<'firstChild' | 'center'>('firstChild');
+  // ===== Toolbar overrides =====
+  opt_linkStyle = signal<LinkStyle>('orthogonal');
+  opt_layoutAlign = signal<LayoutAlign>('firstChild');
+  opt_layoutDirection = signal<LayoutDirection>('RIGHT');
 
-  // ===== Vista derivada (mensajes) =====
+  // ===== Mensajes derivados =====
   isLoadingView = computed(
     () => this.settings()?.messages?.isLoading ?? this.isLoading()
   );
@@ -351,17 +389,30 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     () => this.settings()?.messages?.errorMessage ?? this.errorMessage()
   );
 
-  // ===== Colapso/expansión =====
+  // ===== Collapse/expand =====
   private childrenById = new Map<string, string[]>();
   private parentsById = new Map<string, string[]>();
   private collapsed = new Set<string>();
 
-  /** Flag derivado: `settings.dataView.enableCollapse`. */
   enableCollapse = computed<boolean>(() => {
     const b = this.baseSettings();
     return (
-      b.dataView?.enableCollapse ?? DEFAULT_SETTINGS.dataView!.enableCollapse!
+      b.dataView?.enableCollapse ?? DEFAULT_SETTINGS.dataView.enableCollapse!
     );
+  });
+
+  // ===== Toolbar controls visibility =====
+  toolbarShowLinkStyle = computed<boolean>(() => {
+    const b = this.baseSettings();
+    return b.viewport?.toolbarControls?.showLinkStyle ?? true;
+  });
+  toolbarShowLayoutAlign = computed<boolean>(() => {
+    const b = this.baseSettings();
+    return b.viewport?.toolbarControls?.showLayoutAlign ?? true;
+  });
+  toolbarShowLayoutDirection = computed<boolean>(() => {
+    const b = this.baseSettings();
+    return b.viewport?.toolbarControls?.showLayoutDirection ?? true;
   });
 
   constructor(
@@ -369,9 +420,7 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     private layoutService: SchemaLayoutService
   ) {}
 
-  // ===== Merge a settings efectivos =====
-
-  //  settings base (sin overrides de toolbar)
+  // ===== Settings efectivos =====
   baseSettings = computed<SchemaSettings>(() => {
     const s = this.settings() ?? {};
     return {
@@ -384,45 +433,44 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     };
   });
 
-  /**
-   * Settings efectivos:
-   * - DEFAULT_SETTINGS
-   * - + settings() (usuario)
-   * - + overrides de toolbar: layout.linkStyle y layout.layoutAlign
-   */
   effectiveSettings = computed<SchemaSettings>(() => {
     const b = this.baseSettings();
     return {
       ...b,
       layout: {
         ...b.layout,
-        linkStyle: this.opt_linkStyle(), // override en runtime
-        layoutAlign: this.opt_layoutAlign(), // override en runtime
+        linkStyle: this.opt_linkStyle(),
+        layoutAlign: this.opt_layoutAlign(),
+        layoutDirection: this.opt_layoutDirection(),
       },
     };
   });
 
-  /** Relee viewport y toolbar desde los settings efectivos. */
   private recomputeFromSettings(): void {
     const b = this.baseSettings();
 
     // viewport
     this.viewportHeight.set(
-      b.viewport?.height ?? DEFAULT_SETTINGS.viewport!.height!
+      b.viewport?.height ?? DEFAULT_SETTINGS.viewport.height!
     );
     this.minViewportHeight.set(
-      b.viewport?.minHeight ?? DEFAULT_SETTINGS.viewport!.minHeight!
+      b.viewport?.minHeight ?? DEFAULT_SETTINGS.viewport.minHeight!
     );
     this.showToolbar.set(
-      b.viewport?.showToolbar ?? DEFAULT_SETTINGS.viewport!.showToolbar!
+      b.viewport?.showToolbar ?? DEFAULT_SETTINGS.viewport.showToolbar!
     );
 
-    // selectors: toman el valor por defecto real (o el del usuario), NO lo pisamos
+    // toolbar defaults (no forzamos al usuario, inicializamos desde settings reales)
     this.opt_linkStyle.set(
-      (b.layout?.linkStyle ?? DEFAULT_SETTINGS.layout!.linkStyle!) as any
+      (b.layout?.linkStyle ?? DEFAULT_SETTINGS.layout.linkStyle) as LinkStyle
     );
     this.opt_layoutAlign.set(
-      (b.layout?.layoutAlign ?? DEFAULT_SETTINGS.layout!.layoutAlign!) as any
+      (b.layout?.layoutAlign ??
+        DEFAULT_SETTINGS.layout.layoutAlign) as LayoutAlign
+    );
+    this.opt_layoutDirection.set(
+      (b.layout?.layoutDirection ??
+        DEFAULT_SETTINGS.layout.layoutDirection) as LayoutDirection
     );
   }
 
@@ -430,9 +478,6 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
   ngAfterViewInit(): void {
     this.recomputeFromSettings();
     this.compute();
-    console.log('XXX - this.data()', this.data());
-    console.log('XXX - this.settings()', this.settings());
-    console.log('XXX - this.cardTemplate()', this.cardTemplate());
   }
 
   ngOnChanges(_: SimpleChanges): void {
@@ -521,7 +566,7 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
 
     const s = this.effectiveSettings();
 
-    // 1) Normalizar grafo completo (adapter debe aceptar settings o mapearlos)
+    // 1) Normalizar grafo completo
     const normalized = this.adapter.normalize(this.data(), s);
     this.ensurePinMeta(normalized, s);
     this.fullGraph.set(this.cloneGraph(normalized));
@@ -539,10 +584,10 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     let laid = await this.layoutService.layout(visible, s);
     this.graph.set(this.cloneGraph(laid));
 
-    // 6) Medición y relayout (si está activo)
+    // 6) Medición y relayout
     if (
       s.dataView?.autoResizeCards ??
-      DEFAULT_SETTINGS.dataView!.autoResizeCards!
+      DEFAULT_SETTINGS.dataView.autoResizeCards
     ) {
       const maxPasses = 6;
       for (let pass = 1; pass <= maxPasses; pass++) {
@@ -554,11 +599,12 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
         this.graph.set(this.cloneGraph(laid));
       }
     }
+
     // 7) Encuadre
     this.updateVirtualSizeFromGraph(laid);
     this.fitToView();
 
-    // 8) Debug
+    // 8) Debug opcional
     if (s.debug?.exposeOnWindow) {
       (window as any).schemaDebug = {
         get graph() {
@@ -566,55 +612,44 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
         },
         settings: s,
       };
-      // eslint-disable-next-line no-console
       console.log('schemaDebug disponible en window.schemaDebug');
     }
   }
+
   private async relayoutVisible(
     anchorId?: string,
     anchorScreen?: { x: number; y: number }
   ): Promise<void> {
     const s = this.effectiveSettings();
 
-    // 1) Subgrafo visible (parte de fullGraph, que ya persiste tamaños medidos)
     const visible = this.buildVisibleGraphFromCollapsed();
 
-    // 2) Layout inicial y lo aplicamos al grafo visible
     let laid = await this.layoutService.layout(visible, s);
     this.graph.set(this.cloneGraph(laid));
 
-    // 3) Medición + relayout incremental usando SIEMPRE this.graph()
     if (
       s.dataView?.autoResizeCards ??
-      DEFAULT_SETTINGS.dataView!.autoResizeCards!
+      DEFAULT_SETTINGS.dataView.autoResizeCards
     ) {
       const maxPasses = 4;
       for (let pass = 1; pass <= maxPasses; pass++) {
         await this.nextFrame();
         const changed = this.measureAndApply(pass, !!s.debug?.measure);
         if (!changed) break;
-
-        // relayout con el grafo que ACABA de medir
         laid = await this.layoutService.layout(this.graph(), s);
         this.graph.set(this.cloneGraph(laid));
       }
     }
 
-    // 4) Ajustar tamaño del stage y animar con anclaje
     this.updateVirtualSizeFromGraph(laid);
     await this.animateToGraph(laid, 260, anchorId, anchorScreen);
   }
 
   // ===== Medición DOM =====
-  /**
-   * Mide el tamaño intrínseco de cada card (forzando width/height:auto
-   * temporalmente) para evitar sumar extraW/extraH en cada relayout.
-   * También persiste los tamaños medidos en `fullGraph` para futuros relayouts.
-   */
   private measureAndApply(_pass: number, _log = false): boolean {
     const s = this.effectiveSettings();
-    const extraW = s.dataView?.measureExtraWidthPx ?? 0;
-    const extraH = s.dataView?.measureExtraHeightPx ?? 0;
+    const extraW = s.dataView?.paddingWidthPx ?? 0;
+    const extraH = s.dataView?.paddingHeightPx ?? 0;
     const maxW = s.dataView?.maxCardWidth ?? Infinity;
     const maxH = s.dataView?.maxCardHeight ?? Infinity;
 
@@ -635,18 +670,15 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
       const node = visMap.get(id);
       if (!node) continue;
 
-      // Guardamos estilos actuales y medimos tamaño intrínseco (auto)
       const prevW = el.style.width;
       const prevH = el.style.height;
 
       el.style.width = 'auto';
       el.style.height = 'auto';
 
-      // Fuerza reflow y toma medidas intrínsecas
       const wIntrinsic = Math.ceil(el.scrollWidth);
       const hIntrinsic = Math.ceil(el.scrollHeight);
 
-      // Restauramos estilos para no parpadear
       el.style.width = prevW;
       el.style.height = prevH;
 
@@ -658,7 +690,6 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
         node.height = targetH;
         changed = true;
 
-        // Persistimos también en el grafo completo para futuros relayouts
         const full = fullMap.get(id);
         if (full) {
           full.width = targetW;
@@ -807,12 +838,17 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
 
   setLinkStyle(v: string) {
     const ok = v === 'orthogonal' || v === 'curve' || v === 'line';
-    this.opt_linkStyle.set(ok ? (v as any) : 'orthogonal');
+    this.opt_linkStyle.set(ok ? (v as LinkStyle) : 'orthogonal');
     this.relayoutVisible();
   }
   setLayoutAlign(v: string) {
     const ok = v === 'firstChild' || v === 'center';
-    this.opt_layoutAlign.set(ok ? (v as any) : 'center');
+    this.opt_layoutAlign.set(ok ? (v as LayoutAlign) : 'center');
+    this.relayoutVisible();
+  }
+  setLayoutDirection(v: string) {
+    const ok = v === 'RIGHT' || v === 'DOWN';
+    this.opt_layoutDirection.set(ok ? (v as LayoutDirection) : 'RIGHT');
     this.relayoutVisible();
   }
 
@@ -883,7 +919,7 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
         meta: { ...(target.meta ?? {}) },
       };
 
-      // nodos visibles en destino
+      // nodos
       for (const endNode of target.nodes) {
         const s = startNodeById.get(endNode.id) ?? endNode;
         const xn = lerp(s.x ?? 0, endNode.x ?? 0, t);
@@ -912,9 +948,8 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
 
       this.graph.set(frame);
 
-      if (anchorId && anchorScreen) {
+      if (anchorId && anchorScreen)
         this.applyAnchorAfterLayout(anchorId, anchorScreen);
-      }
 
       if (raw < 1) {
         requestAnimationFrame(() => run(resolve));
@@ -930,7 +965,8 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
       requestAnimationFrame(() => run(resolve))
     );
   }
-  /** Asegura que existan los mapas de pin en meta según la dirección del layout. */
+
+  /** Asegura mapas de pin en meta según dirección del layout. */
   private ensurePinMeta(g: NormalizedGraph, s: SchemaSettings): void {
     if (!g.meta) g.meta = {};
     const dir =
@@ -938,10 +974,10 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     const key = dir === 'RIGHT' ? 'pinY' : 'pinX';
     if (!g.meta[key]) g.meta[key] = {};
   }
-  // Ajusta el tamaño virtual del stage en función de los bounds del grafo
-  // URL: projects/schema/src/lib/components/schema.component.ts
+
+  // ===== Stage size =====
   private updateVirtualSizeFromGraph(g: NormalizedGraph): void {
-    const pad = 200; // margen extra para pan cómodo y curvas largas
+    const pad = 200;
     let minX = Infinity,
       minY = Infinity,
       maxX = -Infinity,
@@ -964,7 +1000,6 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
       !isFinite(maxX) ||
       !isFinite(maxY)
     ) {
-      // fallback seguro
       this.virtualWidth = 12000;
       this.virtualHeight = 6000;
       return;
@@ -973,8 +1008,6 @@ export class SchemaComponent implements AfterViewInit, OnChanges {
     const neededW = Math.max(1, Math.ceil(maxX - Math.min(0, minX)) + pad);
     const neededH = Math.max(1, Math.ceil(maxY - Math.min(0, minY)) + pad);
 
-    // No achicamos de golpe para evitar “saltos” molestos al relayout;
-    // pero sí crecemos cuando hace falta.
     this.virtualWidth = Math.max(this.virtualWidth, neededW);
     this.virtualHeight = Math.max(this.virtualHeight, neededH);
   }

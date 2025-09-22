@@ -1,10 +1,5 @@
 // projects/schema/src/lib/components/schema-card.component.ts
-// ==========================================================
-// SchemaCardComponent (sin SchemaOptions)
-// - Migrado a SchemaSettings + DEFAULT_SETTINGS.
-// - Aplana settings relevantes para la card con un computed `view`.
-// - Mantiene API pública (inputs/outputs) salvo el reemplazo de `options` → `settings`.
-// ==========================================================
+// URL: projects/schema/src/lib/components/schema-card.component.ts
 
 import {
   ChangeDetectionStrategy,
@@ -19,36 +14,29 @@ import { SchemaNode, SchemaSettings, DEFAULT_SETTINGS } from '../models';
 import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
 
 /**
- * Componente visual para renderizar un {@link SchemaNode} como card.
+ * Renderiza un {@link SchemaNode} como card.
  *
- * ### Responsabilidades
- * - Renderiza un nodo con **título** (si `showTitle === true`), **preview** de atributos
- *   (`jsonMeta.attributes`) y **badges** con conteos de arrays no escalares (`jsonMeta.arrayCounts`).
- * - Permite **template custom** vía `cardTemplate` (inserta el nodo como `$implicit`).
- * - Expone **acentos visuales** según settings de `colors` y `dataView`.
- * - Muestra un **botón de colapso/expansión** overlay cuando:
- *     - `showCollapseControls === true` **y**
- *     - `hasChildren === true`.
- *   El botón **no interfiere** con el contenido del template.
- * - Emite `nodeClick` y `toggleRequest` sin burbujas de eventos.
+ * - Título (opcional), preview de atributos (`jsonMeta.attributes`) y badges de arrays (`jsonMeta.arrayCounts`).
+ * - Permite template custom con `cardTemplate` (el nodo se expone como `$implicit`).
+ * - Acentos visuales según `settings.colors` y `settings.dataView`.
+ * - Botón de colapso/expansión si `showCollapseControls === true` y `hasChildren === true`.
  *
- * ### Inputs
- * - `node`: nodo actual a renderizar.
- * - `cardTemplate`: ng-template custom (opcional).
- * - `settings`: configuración por secciones (colors/layout/dataView/debug).
- * - `hasChildren`: indica si el nodo tiene hijos en el grafo completo (para mostrar el botón).
- * - `showCollapseControls`: fuerza la visibilidad del botón (controlado por el contenedor).
- * - `isCollapsed`: estado visual para rotar el ícono del botón.
+ * @example
+ * ```html
+ * <schema-card
+ *   [node]="n"
+ *   [settings]="settings"
+ *   [cardTemplate]="tpl"
+ *   [hasChildren]="true"
+ *   [showCollapseControls]="true"
+ *   (toggleRequest)="onToggle($event)"
+ *   (nodeClick)="onNodeClick($event)"
+ * ></schema-card>
  *
- * ### Outputs
- * - `nodeClick(SchemaNode)`: emitido al click sobre la card (selección).
- * - `toggleRequest(SchemaNode)`: emitido al click del botón overlay de colapso/expansión.
- *
- * ### Accesibilidad
- * - El botón tiene `aria-pressed` según `isCollapsed`.
- *
- * ### Rendimiento
- * - `ChangeDetectionStrategy.OnPush` para minimizar recalculos.
+ * <ng-template #tpl let-node>
+ *   <strong>{{ node.jsonMeta?.title || node.label }}</strong>
+ * </ng-template>
+ * ```
  */
 @Component({
   selector: 'schema-card',
@@ -69,7 +57,6 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
       (click)="onClick($event)"
       style="z-index: 1; position: absolute;"
     >
-      <!-- Botón superpuesto: no interfiere con el contenido -->
       <button
         *ngIf="showCollapseControls() && hasChildren()"
         type="button"
@@ -115,6 +102,7 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
               }
             </div>
           </div>
+
           <div
             class="array-badges"
             *ngIf="node()?.jsonMeta?.arrayCounts as arrs"
@@ -159,9 +147,6 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
         padding: 0;
         line-height: 1;
         z-index: 2;
-        span {
-          font-size: 0.5rem;
-        }
       }
       .chev {
         display: inline-block;
@@ -254,62 +239,19 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SchemaCardComponent {
-  // ===== Inputs =====
-
-  /**
-   * Nodo que se va a renderizar.
-   * @required
-   * @remarks Debe contener `jsonMeta` si se desea mostrar título/preview por defecto.
-   */
+  // Inputs
   node = input.required<SchemaNode>();
-
-  /**
-   * Template personalizado para el contenido de la card.
-   * - Se invoca con el nodo como `$implicit`.
-   * - Si no se asigna, se usa el template por defecto (título + preview).
-   */
   cardTemplate = input<TemplateRef<any> | null>(null);
-
-  /**
-   * Settings efectivos (mergeados por el contenedor).
-   * Se usan `colors`, `dataView` y `debug` para aplanar las opciones de la card.
-   * @default DEFAULT_SETTINGS
-   */
   settings = input<SchemaSettings>(DEFAULT_SETTINGS);
-
-  /**
-   * Indica si el nodo posee hijos en el grafo completo.
-   * Controla la visibilidad del botón de colapso cuando `showCollapseControls` es true.
-   * @default false
-   */
   hasChildren = input<boolean>(false);
-
-  /**
-   * Control visual de la presencia del botón de colapso.
-   * Normalmente lo controla el contenedor según `dataView.enableCollapse`.
-   * @default false
-   */
   showCollapseControls = input<boolean>(false);
-
-  /**
-   * Estado visual del toggle (rota el ícono de la chevron).
-   * @default false
-   */
   isCollapsed = input<boolean>(false);
 
-  // ===== Outputs =====
-
-  /** Emite cuando se hace click en la card (selección del nodo actual). */
+  // Outputs
   @Output() nodeClick = new EventEmitter<SchemaNode>();
-
-  /** Emite cuando se solicita colapsar/expandir este nodo (click al botón overlay). */
   @Output() toggleRequest = new EventEmitter<SchemaNode>();
 
-  // ====== Vista aplanada para el template (evita repetir lookups) ======
-  /**
-   * `view`: computed con las propiedades planas que usa la card, derivadas de `settings`.
-   * Esto evita recalcular y ensuciar el template con múltiples accesos anidados.
-   */
+  /** Vista aplanada derivada de settings. */
   view = computed(() => {
     const s = this.settings() ?? DEFAULT_SETTINGS;
     return {
@@ -322,7 +264,7 @@ export class SchemaCardComponent {
       valueShowTooltip: s.dataView?.valueShowTooltip ?? false,
       valueMaxChars: s.dataView?.valueMaxChars ?? null,
 
-      // colors (acentos)
+      // colors
       accentByKey: s.colors?.accentByKey ?? null,
       accentFill: s.colors?.accentFill ?? false,
       accentInverse: s.colors?.accentInverse ?? false,
@@ -335,95 +277,58 @@ export class SchemaCardComponent {
     };
   });
 
-  // ===== API interna (métodos de ayuda) =====
-
-  /**
-   * Manejador de click sobre la card.
-   * - Detiene la propagación para no afectar el stage/pan.
-   * - Emite `nodeClick` con el nodo actual.
-   */
+  // API interna
   onClick(event: MouseEvent) {
     event.stopPropagation();
     this.nodeClick.emit(this.node()!);
   }
 
-  /**
-   * Convierte un objeto plano en una lista de pares [clave, valor].
-   * @param obj Objeto a convertir.
-   * @returns Array de pares, preservando el orden enumerado.
-   */
-  objToPairs(obj: Record<string, any>) {
+  objToPairs(obj: Record<string, unknown>) {
     return Object.entries(obj);
   }
 
-  /**
-   * Manejador de click del botón de colapso/expansión overlay.
-   * - Detiene la propagación.
-   * - Emite `toggleRequest` con el nodo actual.
-   */
   onToggle(event: MouseEvent) {
     event.stopPropagation();
     this.toggleRequest.emit(this.node()!);
   }
 
-  /**
-   * Calcula clases CSS de acento según:
-   * - `view().accentByKey` y valor booleano/null en `node.data[k]`.
-   * - `view().accentFill` y `view().accentInverse`.
-   * - `view().showColorTrue/False/Null`.
-   *
-   * @returns Array de clases: `accent-true|false|null` y, si aplica, `accent-fill-*`.
-   */
   getAccentClasses(): string[] {
-    const {
-      accentByKey,
-      accentFill,
-      accentInverse,
-      showColorTrue,
-      showColorFalse,
-      showColorNull,
-    } = this.view();
-    if (!accentByKey) return [];
-
-    const v = this.node()?.data?.[accentByKey];
+    const v = this.view();
+    const k = v.accentByKey;
+    if (!k) return [];
+    const val = this.node()?.data?.[k];
     const classes: string[] = [];
 
-    if (accentInverse) {
-      if (v === true && showColorTrue) classes.push('accent-false');
-      if (v === false && showColorFalse) classes.push('accent-true');
-      if (v === null && showColorNull) classes.push('accent-null');
-      if (accentFill) {
-        if (v === true && showColorTrue) classes.push('accent-fill-false');
-        if (v === false && showColorFalse) classes.push('accent-fill-true');
-        if (v === null && showColorNull) classes.push('accent-fill-null');
+    const pushIf = (cond: boolean, cls: string) => {
+      if (cond) classes.push(cls);
+    };
+
+    if (!v.accentInverse) {
+      pushIf(val === true && v.showColorTrue, 'accent-true');
+      pushIf(val === false && v.showColorFalse, 'accent-false');
+      pushIf(val === null && v.showColorNull, 'accent-null');
+      if (v.accentFill) {
+        pushIf(val === true && v.showColorTrue, 'accent-fill-true');
+        pushIf(val === false && v.showColorFalse, 'accent-fill-false');
+        pushIf(val === null && v.showColorNull, 'accent-fill-null');
       }
-      return classes;
     } else {
-      if (v === true && showColorTrue) classes.push('accent-true');
-      if (v === false && showColorFalse) classes.push('accent-false');
-      if (v === null && showColorNull) classes.push('accent-null');
-      if (accentFill) {
-        if (v === true && showColorTrue) classes.push('accent-fill-true');
-        if (v === false && showColorFalse) classes.push('accent-fill-false');
-        if (v === null && showColorNull) classes.push('accent-fill-null');
+      pushIf(val === true && v.showColorTrue, 'accent-false');
+      pushIf(val === false && v.showColorFalse, 'accent-true');
+      pushIf(val === null && v.showColorNull, 'accent-null');
+      if (v.accentFill) {
+        pushIf(val === true && v.showColorTrue, 'accent-fill-false');
+        pushIf(val === false && v.showColorFalse, 'accent-fill-true');
+        pushIf(val === null && v.showColorNull, 'accent-fill-null');
       }
-      return classes;
     }
+    return classes;
   }
 
-  /**
-   * Indica si una determinada clave debe representarse en **una sola línea** (nowrap).
-   * @param key Clave a evaluar.
-   * @returns `true` si `key` está incluida en `dataView.noWrapKeys`.
-   */
   isNoWrapKey(key: string): boolean {
     return this.view().noWrapKeys.includes(key);
   }
-  /**
-   * Devuelve el glifo del botón colapsar/expandir según:
-   * - Dirección del layout (RIGHT → ◀/▶, DOWN → ▲/▼)
-   * - Estado actual (colapsado = mostrar “expandir”, expandido = mostrar “colapsar”)
-   */
+
   arrowGlyph(): string {
     const dir =
       this.settings()?.layout?.layoutDirection ??
@@ -431,46 +336,30 @@ export class SchemaCardComponent {
     const collapsed = !!this.isCollapsed();
 
     if (dir === 'DOWN') {
-      // Colapsado → mostrar “expandir hacia abajo” (▼)
-      // Expandido → mostrar “colapsar hacia arriba” (▲)
       return collapsed ? '▼' : '▲';
     }
-
-    // RIGHT (por defecto):
-    // Colapsado → mostrar “expandir hacia la derecha” (▶)
-    // Expandido → mostrar “colapsar hacia la izquierda” (◀)
     return collapsed ? '▶' : '◀';
   }
-  /**
-   * Devuelve el texto a mostrar, truncando según valueMaxChars.
-   * Aplica a strings, numbers y cadenas pre-concatenadas de arrays escalares.
-   */
-  displayValue(val: any): string {
-    // Normaliza a string (booleans quedan "true"/"false")
+
+  displayValue(val: unknown): string {
     const str = val == null ? String(val) : String(val);
     const limit = this.view().valueMaxChars;
-
     if (typeof limit === 'number' && limit > 0 && str.length > limit) {
       return str.slice(0, limit) + '…';
     }
     return str;
   }
 
-  /**
-   * Título (tooltip) con el valor completo si valueShowTooltip es true.
-   * Si es false, no agrega atributo title.
-   */
-  valueTitle(val: any): string | null {
+  valueTitle(val: unknown): string | null {
     if (!this.view().valueShowTooltip) return null;
     return val == null ? String(val) : String(val);
   }
-  /** Devuelve la etiqueta visible para una clave, usando dataView.labelData si existe. */
+
   displayKey(key: string): string {
     const map = this.view().labelData ?? {};
-    return map && Object.prototype.hasOwnProperty.call(map, key)
-      ? map[key]
-      : key;
+    return Object.prototype.hasOwnProperty.call(map, key) ? map[key] : key;
   }
+
   hasComputedTitle(): boolean {
     const t = this.node()?.jsonMeta?.title;
     return !!t && String(t).trim() !== '';

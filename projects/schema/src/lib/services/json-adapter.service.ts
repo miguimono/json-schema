@@ -1,10 +1,5 @@
 // projects/schema/src/lib/services/json-adapter.service.ts
-// =======================================================
-// JsonAdapterService
-// Convierte un JSON arbitrario en un grafo normalizado (nodos + aristas),
-// utilizando SchemaSettings (sin SchemaOptions). Los valores por defecto
-// provienen de DEFAULT_SETTINGS y se combinan por sección (deep merge).
-// =======================================================
+// URL: projects/schema/src/lib/services/json-adapter.service.ts
 
 import { Injectable } from '@angular/core';
 import {
@@ -16,26 +11,38 @@ import {
 } from '../models';
 
 /**
- * Servicio que convierte un JSON arbitrario en un grafo normalizado (nodos + aristas).
+ * Convierte un JSON arbitrario en un grafo normalizado (nodos + aristas).
  *
- * ### Reglas principales de normalización:
- * - **Entidad:** objeto con al menos un escalar → genera un nodo.
- * - **Arrays escalares:** opcionalmente se muestran como atributo concatenado (preview).
- * - **Wrappers de único hijo:** si no contienen escalares, se colapsan (opcional).
- * - **Orden de hermanos:** se preserva en `jsonMeta.childOrder`.
- * - **childrenCount** y **arrayCounts** se anotan en `jsonMeta`.
+ * Reglas de normalización:
+ * - Objeto con al menos un escalar ⇒ genera nodo (entidad).
+ * - Arrays de escalares → si `dataView.treatScalarArraysAsAttribute === true`,
+ *   se añaden como atributo concatenado en el preview.
+ *   Ejemplo: `{ tags: ['rojo','verde'] }` ⇒ `tags: "rojo, verde"`.
+ * - Se preserva el orden de hermanos en `jsonMeta.childOrder`.
+ * - Se anotan `childrenCount` y `arrayCounts` por nodo.
  */
 @Injectable({ providedIn: 'root' })
 export class JsonAdapterService {
   /**
    * Convierte un input JSON en {@link NormalizedGraph}.
    *
-   * @param input JSON arbitrario de entrada.
+   * @param input JSON arbitrario.
    * @param opts  Settings parciales (se combinan con {@link DEFAULT_SETTINGS} por sección).
-   * @returns Grafo normalizado con nodos y aristas, incluyendo metadatos auxiliares.
+   * @returns Grafo con nodos, aristas y metadatos auxiliares.
+   *
+   * @example
+   * ```ts
+   * const graph = adapter.normalize(data, {
+   *   dataView: {
+   *     showTitle: true,
+   *     titleKeyPriority: ['name','title','id'],
+   *     treatScalarArraysAsAttribute: true
+   *   }
+   * });
+   * ```
    */
   normalize(input: any, opts: Partial<SchemaSettings> = {}): NormalizedGraph {
-    // ===== Merge por secciones (deep-merge ligero) =====
+    // Merge por secciones
     const settings: Required<SchemaSettings> = {
       colors: { ...DEFAULT_SETTINGS.colors, ...(opts.colors ?? {}) },
       layout: { ...DEFAULT_SETTINGS.layout, ...(opts.layout ?? {}) },
@@ -47,43 +54,31 @@ export class JsonAdapterService {
 
     const dv = settings.dataView;
 
-    // ======== VALORES EFECTIVOS (sin undefined) ========
-    // Estas constantes resuelven los “posiblemente undefined” de TS.
-    const titleKeyPriority =
-      dv.titleKeyPriority ?? DEFAULT_SETTINGS.dataView.titleKeyPriority;
-    const hiddenKeysGlobal: string[] =
-      dv.hiddenKeysGlobal ?? DEFAULT_SETTINGS.dataView.hiddenKeysGlobal ?? [];
+    // Valores efectivos (linter-safe)
+    const titleKeyPriority = dv.titleKeyPriority ?? [];
+    const hiddenKeysGlobal: string[] = dv.hiddenKeysGlobal ?? [];
     const treatScalarArraysAsAttribute =
-      dv.treatScalarArraysAsAttribute ??
-      DEFAULT_SETTINGS.dataView.treatScalarArraysAsAttribute;
-    const previewMaxKeys =
-      dv.previewMaxKeys ?? DEFAULT_SETTINGS.dataView.previewMaxKeys;
-    const defaultNodeSize =
-      dv.defaultNodeSize ?? DEFAULT_SETTINGS.dataView.defaultNodeSize;
-    const maxDepth = dv.maxDepth ?? DEFAULT_SETTINGS.dataView.maxDepth;
+      dv.treatScalarArraysAsAttribute ?? false;
+    const previewMaxKeys = dv.previewMaxKeys ?? 999;
+    const defaultNodeSize = dv.defaultNodeSize ?? { width: 256, height: 64 };
+    const maxDepth = dv.maxDepth ?? null;
+    const showTitle = dv.showTitle ?? DEFAULT_SETTINGS.dataView.showTitle;
 
     const nodes: SchemaNode[] = [];
     const edges: SchemaEdge[] = [];
 
-    /** Determina si un valor es escalar (string, number, boolean o null). */
-    const isScalar = (v: any): boolean =>
+    // === helpers ===
+    const isScalar = (v: unknown): boolean =>
       v === null || ['string', 'number', 'boolean'].includes(typeof v);
 
-    /** True si el array contiene al menos un elemento y todos son escalares. */
-    const arrayIsScalar = (arr: any[]): boolean =>
-      arr.length > 0 && arr.every(isScalar);
+    const arrayIsScalar = (arr: unknown[]): boolean =>
+      Array.isArray(arr) && arr.length > 0 && arr.every(isScalar);
 
     /**
-     * Elige un título para la card de un objeto.
-     *
-     * @param obj Objeto candidato a nodo.
-     * @param priorities Lista de claves prioritarias.
-     * @returns Objeto con título elegido y clave usada.
-     *
-     * Estrategia:
-     * - Busca por prioridades y devuelve el primer valor válido.
-     * - Si no encuentra, usa el primer escalar presente en el objeto.
-     * - Si no existe nada, retorna "Item".
+     * Selecciona título para una card.
+     * - Busca por prioridades.
+     * - Si no hay, usa el primer escalar del objeto.
+     * - Si no existe, devuelve "Item".
      */
     const pickTitle = (
       obj: any,
@@ -97,21 +92,29 @@ export class JsonAdapterService {
           }
         }
       }
+      // Fallback: primer escalar encontrado
+      for (const [k, v] of Object.entries(obj ?? {})) {
+        if (v == null) continue;
+        const t = typeof v;
+        if (t === 'string' || t === 'number' || t === 'boolean') {
+          return { title: String(v), usedKey: k };
+        }
+      }
       return { title: '', usedKey: undefined };
     };
 
     /**
      * Construye los atributos de vista previa para un nodo.
-     *
-     * @param obj Objeto fuente.
-     * @param usedKey Clave usada para el título (se omite en el preview).
-     * @returns Objeto clave/valor con atributos de preview.
-     *
-     * Reglas:
-     * - Omite claves ocultas (`hiddenKeysGlobal`) y la clave usada como título.
+     * - Omite claves en `hiddenKeysGlobal`.
+     * - Si `showTitle===true` y `usedKey` existe, omite esa clave (para no duplicar lo que ya se verá como título).
      * - Incluye escalares.
-     * - Incluye arrays de escalares como string concatenado si `treatScalarArraysAsAttribute=true`.
-     * - Respeta límite de `previewMaxKeys`.
+     * - Incluye arrays escalares como string concatenado si `treatScalarArraysAsAttribute=true`.
+     * - Respeta `previewMaxKeys`.
+     *
+     * @example
+     * // obj = { nivel: "Nivel0", se_muestra: "Se muestra", tags: ["red","green"] }
+     * // showTitle = false -> incluye 'nivel' y 'se_muestra' en el preview
+     * // showTitle = true  -> si usedKey="nivel", NO incluye 'nivel' en el preview
      */
     const buildPreviewAttributes = (
       obj: any,
@@ -120,9 +123,13 @@ export class JsonAdapterService {
       const entries: [string, any][] = [];
       for (const [k, v] of Object.entries(obj ?? {})) {
         if (hiddenKeysGlobal.includes(k)) continue;
-        if (usedKey && k === usedKey) continue;
-        if (isScalar(v)) entries.push([k, v]);
-        else if (
+
+        // 👇 Solo ocultamos la clave del título cuando efectivamente se mostrará el título
+        if (showTitle && usedKey && k === usedKey) continue;
+
+        if (isScalar(v)) {
+          entries.push([k, v]);
+        } else if (
           Array.isArray(v) &&
           treatScalarArraysAsAttribute &&
           arrayIsScalar(v)
@@ -133,23 +140,17 @@ export class JsonAdapterService {
       return Object.fromEntries(entries.slice(0, previewMaxKeys));
     };
 
-    /**
-     * Determina si un objeto es "entidad":
-     * - Debe ser objeto.
-     * - Debe tener al menos un escalar.
-     */
-    const isEntity = (obj: any): boolean => {
+    const isEntity = (obj: unknown): obj is Record<string, unknown> => {
       if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
       return Object.values(obj).some(isScalar);
     };
 
-    /**
-     * Obtiene tamaños de arrays no escalares de un objeto.
-     * @returns Mapa clave → tamaño.
-     */
-    const arrayCountsOf = (obj: any): Record<string, number> => {
+    /** Tamaños de arrays no escalares por clave. */
+    const arrayCountsOf = (
+      obj: Record<string, unknown>
+    ): Record<string, number> => {
       const out: Record<string, number> = {};
-      for (const [k, v] of Object.entries(obj ?? {})) {
+      for (const [k, v] of Object.entries(obj)) {
         if (Array.isArray(v) && !(v.length > 0 && v.every(isScalar))) {
           out[k] = v.length;
         }
@@ -157,25 +158,19 @@ export class JsonAdapterService {
       return out;
     };
 
-    // Contadores de hijos y orden relativo por padre
+    // Contadores de hijos y orden relativo
     const childCounter = new Map<string, number>();
     const childOrderByParent = new Map<string, number>();
 
     /**
-     * Agrega un nodo al grafo y su arista con el padre (si existe).
-     *
-     * @param jsonPath Ruta JSON del nodo.
-     * @param obj Objeto fuente.
-     * @param parentId ID del nodo padre (opcional).
-     * @returns ID asignado al nodo nuevo.
-     *
-     * Acciones:
-     * - Crea nodo con jsonMeta.title, attributes, childrenCount=0, arrayCounts.
-     * - Asigna childOrder relativo respecto a su padre.
-     * - Crea arista hacia el padre si corresponde.
+     * Crea un nodo y su arista con el padre (si corresponde).
      */
-    const addNode = (jsonPath: string, obj: any, parentId?: string): string => {
-      const { title, usedKey } = pickTitle(obj, titleKeyPriority ?? []);
+    const addNode = (
+      jsonPath: string,
+      obj: Record<string, unknown>,
+      parentId?: string
+    ): string => {
+      const { title, usedKey } = pickTitle(obj, titleKeyPriority);
       const attrs = buildPreviewAttributes(obj, usedKey);
 
       // Orden relativo respecto al padre
@@ -190,16 +185,16 @@ export class JsonAdapterService {
         id: jsonPath,
         jsonPath,
         label: title,
-        data: obj,
+        data: obj as Record<string, any>,
         jsonMeta: {
           title,
-          attributes: buildPreviewAttributes(obj, usedKey),
+          attributes: attrs,
           childrenCount: 0,
           arrayCounts: arrayCountsOf(obj),
           childOrder,
         },
-        width: defaultNodeSize?.width ?? 220,
-        height: defaultNodeSize?.height ?? 96,
+        width: defaultNodeSize.width,
+        height: defaultNodeSize.height,
       };
       nodes.push(node);
 
@@ -214,22 +209,15 @@ export class JsonAdapterService {
     };
 
     /**
-     * Recorre el JSON recursivamente y construye nodos/aristas.
-     *
-     * @param val Valor actual.
-     * @param path Ruta JSON actual.
-     * @param parentId Nodo padre (si existe).
-     * @param depth Profundidad actual.
-     *
-     * Reglas:
-     * - Si es array → recorre elementos.
-     * - Si es wrapper colapsable → lo salta directo a su hijo.
-     * - Si es entidad → crea nodo.
-     * - Recorre hijos objetos/arrays no escalares.
+     * Recorrido recursivo de construcción de grafo.
      */
-    const traverse = (val: any, path: string, parentId?: string, depth = 0) => {
-      // Nota: maxDepth puede ser null → sin límite.
-      if (maxDepth !== undefined && maxDepth !== null && depth > maxDepth)
+    const traverse = (
+      val: unknown,
+      path: string,
+      parentId?: string,
+      depth = 0
+    ) => {
+      if (maxDepth !== null && maxDepth !== undefined && depth > maxDepth)
         return;
 
       if (Array.isArray(val)) {
@@ -240,16 +228,18 @@ export class JsonAdapterService {
       }
 
       if (val && typeof val === 'object') {
+        const obj = val as Record<string, unknown>;
+
         // Entidad → nodo
         let myId = parentId;
-        if (isEntity(val)) {
-          myId = addNode(path, val, parentId);
+        if (isEntity(obj)) {
+          myId = addNode(path, obj, parentId);
           if (parentId)
             childCounter.set(parentId, (childCounter.get(parentId) ?? 0) + 1);
         }
 
         // Recorre hijos no escalares
-        for (const [k, v] of Object.entries(val)) {
+        for (const [k, v] of Object.entries(obj)) {
           if (isScalar(v)) continue;
 
           if (Array.isArray(v)) {
@@ -265,13 +255,14 @@ export class JsonAdapterService {
       }
     };
 
-    // === Inicio del recorrido en raíz ===
+    // Inicio en raíz
     traverse(input, '$', undefined, 0);
 
-    // === Actualiza childrenCount ===
-    nodes.forEach(
-      (n) => (n.jsonMeta!.childrenCount = childCounter.get(n.id) ?? 0)
-    );
+    // childrenCount finales
+    nodes.forEach((n) => {
+      n.jsonMeta = n.jsonMeta ?? {};
+      n.jsonMeta.childrenCount = childCounter.get(n.id) ?? 0;
+    });
 
     return { nodes, edges, meta: {} };
   }
