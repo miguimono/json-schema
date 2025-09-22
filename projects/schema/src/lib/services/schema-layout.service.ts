@@ -1,7 +1,7 @@
 // projects/schema/src/lib/services/schema-layout.service.ts
 // URL: projects/schema/src/lib/services/schema-layout.service.ts
 
-import { Injectable } from '@angular/core';
+import { Injectable } from "@angular/core";
 import {
   DEFAULT_SETTINGS,
   LayoutDirection,
@@ -10,7 +10,7 @@ import {
   SchemaNode,
   SchemaSettings,
   LinkStyle,
-} from '../models';
+} from "../models";
 
 type PinMap = Record<string, number>;
 
@@ -23,7 +23,7 @@ type PinMap = Record<string, number>;
  * - Evita solapes: cada hermano ocupa el alto/ancho de su subárbol.
  * - Calcula puntos de aristas para 'orthogonal' y atajos para 'curve'/'line'.
  */
-@Injectable({ providedIn: 'root' })
+@Injectable({ providedIn: "root" })
 export class SchemaLayoutService {
   /**
    * Calcula posiciones x/y de nodos y puntos de aristas.
@@ -38,29 +38,19 @@ export class SchemaLayoutService {
    * });
    * ```
    */
-  async layout(
-    g: NormalizedGraph,
-    settings: SchemaSettings = DEFAULT_SETTINGS
-  ): Promise<NormalizedGraph> {
+  async layout(g: NormalizedGraph, settings: SchemaSettings = DEFAULT_SETTINGS): Promise<NormalizedGraph> {
     const s = this.mergeSettings(settings);
 
     // --- Lectura de parámetros efectivos ---
-    const dir: LayoutDirection = (s.layout?.layoutDirection ??
-      DEFAULT_SETTINGS.layout.layoutDirection)!;
-    const alignFirstChild =
-      (s.layout?.layoutAlign ?? DEFAULT_SETTINGS.layout.layoutAlign) ===
-      'firstChild';
-    const linkStyle: LinkStyle = (s.layout?.linkStyle ??
-      DEFAULT_SETTINGS.layout.linkStyle)!;
+    const dir: LayoutDirection = (s.layout?.layoutDirection ?? DEFAULT_SETTINGS.layout.layoutDirection)!;
+    const alignFirstChild = (s.layout?.layoutAlign ?? DEFAULT_SETTINGS.layout.layoutAlign) === "firstChild";
+    const linkStyle: LinkStyle = (s.layout?.linkStyle ?? DEFAULT_SETTINGS.layout.linkStyle)!;
 
-    const GAP_X =
-      s.layout?.columnGapPx ?? DEFAULT_SETTINGS.layout.columnGapPx ?? 0;
+    const GAP_X = s.layout?.columnGapPx ?? DEFAULT_SETTINGS.layout.columnGapPx ?? 0;
     const GAP_Y = s.layout?.rowGapPx ?? DEFAULT_SETTINGS.layout.rowGapPx ?? 0;
 
     // --- Índices padres/hijos ---
-    const nodesById = new Map<string, SchemaNode>(
-      g.nodes.map((n) => [n.id, n])
-    );
+    const nodesById = new Map<string, SchemaNode>(g.nodes.map((n) => [n.id, n]));
     const childrenById = new Map<string, string[]>();
     const parentsById = new Map<string, string[]>();
     for (const n of g.nodes) {
@@ -68,8 +58,7 @@ export class SchemaLayoutService {
       parentsById.set(n.id, []);
     }
     for (const e of g.edges) {
-      if (childrenById.has(e.source))
-        childrenById.get(e.source)!.push(e.target);
+      if (childrenById.has(e.source)) childrenById.get(e.source)!.push(e.target);
       if (parentsById.has(e.target)) parentsById.get(e.target)!.push(e.source);
     }
 
@@ -80,14 +69,12 @@ export class SchemaLayoutService {
         const b = nodesById.get(bId);
         const ao = a?.jsonMeta?.childOrder ?? 0;
         const bo = b?.jsonMeta?.childOrder ?? 0;
-        return ao === bo ? (a?.id ?? '').localeCompare(b?.id ?? '') : ao - bo;
+        return ao === bo ? (a?.id ?? "").localeCompare(b?.id ?? "") : ao - bo;
       });
     }
 
     // Raíces (sin padres visibles)
-    const roots = g.nodes.filter(
-      (n) => (parentsById.get(n.id)?.length ?? 0) === 0
-    );
+    const roots = g.nodes.filter((n) => (parentsById.get(n.id)?.length ?? 0) === 0);
 
     // Profundidad por BFS (para offsets por capa)
     const depthById = new Map<string, number>();
@@ -109,18 +96,12 @@ export class SchemaLayoutService {
     const getW = (n: SchemaNode) =>
       Math.max(
         1,
-        n.width ??
-          (DEFAULT_SETTINGS.dataView.defaultNodeSize
-            ? DEFAULT_SETTINGS.dataView.defaultNodeSize.width
-            : 1)
+        n.width ?? (DEFAULT_SETTINGS.dataView.defaultNodeSize ? DEFAULT_SETTINGS.dataView.defaultNodeSize.width : 1),
       );
     const getH = (n: SchemaNode) =>
       Math.max(
         1,
-        n.height ??
-          (DEFAULT_SETTINGS.dataView.defaultNodeSize
-            ? DEFAULT_SETTINGS.dataView.defaultNodeSize.height
-            : 1)
+        n.height ?? (DEFAULT_SETTINGS.dataView.defaultNodeSize ? DEFAULT_SETTINGS.dataView.defaultNodeSize.height : 1),
       );
 
     // Tamaño de subárbol en eje secundario (RIGHT => alto; DOWN => ancho)
@@ -129,7 +110,7 @@ export class SchemaLayoutService {
       const node = nodesById.get(id)!;
       const kids = childrenById.get(id) ?? [];
       if (kids.length === 0) {
-        const leafSize = dir === 'RIGHT' ? getH(node) : getW(node);
+        const leafSize = dir === "RIGHT" ? getH(node) : getW(node);
         subtreeSize.set(id, leafSize);
         return leafSize;
       }
@@ -149,10 +130,7 @@ export class SchemaLayoutService {
     const sizeByDepth: number[] = new Array(maxDepth + 1).fill(0);
     for (let d = 0; d <= maxDepth; d++) {
       const nodesAtD = g.nodes.filter((n) => (depthById.get(n.id) ?? 0) === d);
-      sizeByDepth[d] =
-        dir === 'RIGHT'
-          ? Math.max(1, ...nodesAtD.map(getW), 1)
-          : Math.max(1, ...nodesAtD.map(getH), 1);
+      sizeByDepth[d] = dir === "RIGHT" ? Math.max(1, ...nodesAtD.map(getW), 1) : Math.max(1, ...nodesAtD.map(getH), 1);
     }
     const mainOffset: number[] = new Array(maxDepth + 1).fill(0);
     for (let d = 1; d <= maxDepth; d++) {
@@ -161,7 +139,7 @@ export class SchemaLayoutService {
 
     // Meta pin (Y para RIGHT, X para DOWN)
     const meta = g.meta ?? {};
-    const pinKey = dir === 'RIGHT' ? 'pinY' : 'pinX';
+    const pinKey = dir === "RIGHT" ? "pinY" : "pinX";
     if (!meta[pinKey]) meta[pinKey] = {};
     const pin: PinMap = meta[pinKey] as PinMap;
 
@@ -169,13 +147,12 @@ export class SchemaLayoutService {
     const placeSubtree = (id: string, depth: number, start: number): number => {
       const node = nodesById.get(id)!;
       const kids = childrenById.get(id) ?? [];
-      const mySize =
-        subtreeSize.get(id) ?? (dir === 'RIGHT' ? getH(node) : getW(node));
+      const mySize = subtreeSize.get(id) ?? (dir === "RIGHT" ? getH(node) : getW(node));
       const mainPos = mainOffset[depth] ?? 0;
 
       if (kids.length === 0) {
         const centerSec = start + mySize / 2;
-        if (dir === 'RIGHT') {
+        if (dir === "RIGHT") {
           node.x = Math.round(mainPos);
           node.y = Math.round(centerSec - getH(node) / 2);
           pin[node.id] = Math.round(node.y + getH(node) / 2);
@@ -193,15 +170,11 @@ export class SchemaLayoutService {
       for (let i = 0; i < kids.length; i++) {
         const cid = kids[i];
         const cNode = nodesById.get(cid)!;
-        const cSize =
-          subtreeSize.get(cid) ?? (dir === 'RIGHT' ? getH(cNode) : getW(cNode));
+        const cSize = subtreeSize.get(cid) ?? (dir === "RIGHT" ? getH(cNode) : getW(cNode));
 
         placeSubtree(cid, depth + 1, cursor);
 
-        const cCenter =
-          dir === 'RIGHT'
-            ? (cNode.y ?? 0) + getH(cNode) / 2
-            : (cNode.x ?? 0) + getW(cNode) / 2;
+        const cCenter = dir === "RIGHT" ? (cNode.y ?? 0) + getH(cNode) / 2 : (cNode.x ?? 0) + getW(cNode) / 2;
         childCenters.push(cCenter);
 
         cursor += cSize + (i < kids.length - 1 ? GAP_Y : 0);
@@ -210,10 +183,9 @@ export class SchemaLayoutService {
       // Alineación del padre respecto a los hijos
       const targetCenter = alignFirstChild
         ? childCenters[0]
-        : childCenters.reduce((a, b) => a + b, 0) /
-          Math.max(1, childCenters.length);
+        : childCenters.reduce((a, b) => a + b, 0) / Math.max(1, childCenters.length);
 
-      if (dir === 'RIGHT') {
+      if (dir === "RIGHT") {
         node.x = Math.round(mainPos);
         node.y = Math.round(targetCenter - getH(node) / 2);
         pin[node.id] = Math.round(targetCenter);
@@ -230,8 +202,7 @@ export class SchemaLayoutService {
     let globalCursor = 40;
     for (let i = 0; i < roots.length; i++) {
       const r = roots[i];
-      const rSize =
-        subtreeSize.get(r.id) ?? (dir === 'RIGHT' ? getH(r) : getW(r));
+      const rSize = subtreeSize.get(r.id) ?? (dir === "RIGHT" ? getH(r) : getW(r));
       placeSubtree(r.id, 0, globalCursor);
       globalCursor += rSize + (i < roots.length - 1 ? GAP_Y : 0);
     }
@@ -242,13 +213,13 @@ export class SchemaLayoutService {
       const b = nodesById.get(e.target);
       if (!a || !b) return { ...e, points: [] };
 
-      if (dir === 'RIGHT') {
+      if (dir === "RIGHT") {
         const ax = (a.x ?? 0) + getW(a);
         const ay = (a.y ?? 0) + Math.round(getH(a) / 2);
         const bx = b.x ?? 0;
         const by = (b.y ?? 0) + Math.round(getH(b) / 2);
 
-        if (linkStyle === 'orthogonal') {
+        if (linkStyle === "orthogonal") {
           const midX = Math.round((ax + bx) / 2);
           return {
             ...e,
@@ -274,7 +245,7 @@ export class SchemaLayoutService {
         const bx = (b.x ?? 0) + Math.round(getW(b) / 2);
         const by = b.y ?? 0;
 
-        if (linkStyle === 'orthogonal') {
+        if (linkStyle === "orthogonal") {
           const midY = Math.round((ay + by) / 2);
           return {
             ...e,

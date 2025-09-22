@@ -1,17 +1,9 @@
 // projects/schema/src/lib/components/schema-card.component.ts
 // URL: projects/schema/src/lib/components/schema-card.component.ts
 
-import {
-  ChangeDetectionStrategy,
-  Component,
-  EventEmitter,
-  Output,
-  TemplateRef,
-  computed,
-  input,
-} from '@angular/core';
-import { SchemaNode, SchemaSettings, DEFAULT_SETTINGS } from '../models';
-import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
+import { ChangeDetectionStrategy, Component, EventEmitter, Output, TemplateRef, computed, input } from "@angular/core";
+import { SchemaNode, SchemaSettings, DEFAULT_SETTINGS } from "../models";
+import { CommonModule, NgIf, NgTemplateOutlet } from "@angular/common";
 
 /**
  * Renderiza un {@link SchemaNode} como card.
@@ -39,7 +31,7 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
  * ```
  */
 @Component({
-  selector: 'schema-card',
+  selector: "schema-card",
   standalone: true,
   imports: [CommonModule, NgIf, NgTemplateOutlet],
   template: `
@@ -76,17 +68,11 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
 
       <ng-template #defaultTpl>
         <div class="card-body">
-          <div
-            class="card-title"
-            *ngIf="view().showTitle && hasComputedTitle()"
-          >
+          <div class="card-title" *ngIf="view().showTitle && hasComputedTitle()">
             {{ node()?.jsonMeta?.title }}
           </div>
 
-          <div
-            class="card-preview"
-            *ngIf="node()?.jsonMeta?.attributes as attrs"
-          >
+          <div class="card-preview" *ngIf="node()?.jsonMeta?.attributes as attrs">
             <div *ngFor="let kv of objToPairs(attrs)" class="kv">
               @if (kv[0] != view().accentByKey) {
               <span class="k">{{ displayKey(kv[0]) }}:</span>
@@ -103,14 +89,11 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
             </div>
           </div>
 
-          <div
-            class="array-badges"
-            *ngIf="node()?.jsonMeta?.arrayCounts as arrs"
-          >
+          <div class="array-badges" *ngIf="node()?.jsonMeta?.arrayCounts as arrs">
             <ng-container *ngFor="let e of objToPairs(arrs)">
               <span class="arr-badge">
                 {{ displayKey(e[0]) }}: {{ e[1] }}
-                {{ e[1] === 1 ? 'item' : 'items' }}
+                {{ e[1] === 1 ? "item" : "items" }}
               </span>
             </ng-container>
           </div>
@@ -147,6 +130,9 @@ import { CommonModule, NgIf, NgTemplateOutlet } from '@angular/common';
         padding: 0;
         line-height: 1;
         z-index: 2;
+        span {
+          font-size: 0.5rem;
+        }
       }
       .chev {
         display: inline-block;
@@ -304,22 +290,22 @@ export class SchemaCardComponent {
     };
 
     if (!v.accentInverse) {
-      pushIf(val === true && v.showColorTrue, 'accent-true');
-      pushIf(val === false && v.showColorFalse, 'accent-false');
-      pushIf(val === null && v.showColorNull, 'accent-null');
+      pushIf(val === true && v.showColorTrue, "accent-true");
+      pushIf(val === false && v.showColorFalse, "accent-false");
+      pushIf(val === null && v.showColorNull, "accent-null");
       if (v.accentFill) {
-        pushIf(val === true && v.showColorTrue, 'accent-fill-true');
-        pushIf(val === false && v.showColorFalse, 'accent-fill-false');
-        pushIf(val === null && v.showColorNull, 'accent-fill-null');
+        pushIf(val === true && v.showColorTrue, "accent-fill-true");
+        pushIf(val === false && v.showColorFalse, "accent-fill-false");
+        pushIf(val === null && v.showColorNull, "accent-fill-null");
       }
     } else {
-      pushIf(val === true && v.showColorTrue, 'accent-false');
-      pushIf(val === false && v.showColorFalse, 'accent-true');
-      pushIf(val === null && v.showColorNull, 'accent-null');
+      pushIf(val === true && v.showColorTrue, "accent-false");
+      pushIf(val === false && v.showColorFalse, "accent-true");
+      pushIf(val === null && v.showColorNull, "accent-null");
       if (v.accentFill) {
-        pushIf(val === true && v.showColorTrue, 'accent-fill-false');
-        pushIf(val === false && v.showColorFalse, 'accent-fill-true');
-        pushIf(val === null && v.showColorNull, 'accent-fill-null');
+        pushIf(val === true && v.showColorTrue, "accent-fill-false");
+        pushIf(val === false && v.showColorFalse, "accent-fill-true");
+        pushIf(val === null && v.showColorNull, "accent-fill-null");
       }
     }
     return classes;
@@ -330,22 +316,20 @@ export class SchemaCardComponent {
   }
 
   arrowGlyph(): string {
-    const dir =
-      this.settings()?.layout?.layoutDirection ??
-      DEFAULT_SETTINGS.layout.layoutDirection;
+    const dir = this.settings()?.layout?.layoutDirection ?? DEFAULT_SETTINGS.layout.layoutDirection;
     const collapsed = !!this.isCollapsed();
 
-    if (dir === 'DOWN') {
-      return collapsed ? '▼' : '▲';
+    if (dir === "DOWN") {
+      return collapsed ? "▼" : "▲";
     }
-    return collapsed ? '▶' : '◀';
+    return collapsed ? "▶" : "◀";
   }
 
   displayValue(val: unknown): string {
     const str = val == null ? String(val) : String(val);
     const limit = this.view().valueMaxChars;
-    if (typeof limit === 'number' && limit > 0 && str.length > limit) {
-      return str.slice(0, limit) + '…';
+    if (typeof limit === "number" && limit > 0 && str.length > limit) {
+      return str.slice(0, limit) + "…";
     }
     return str;
   }
@@ -362,6 +346,6 @@ export class SchemaCardComponent {
 
   hasComputedTitle(): boolean {
     const t = this.node()?.jsonMeta?.title;
-    return !!t && String(t).trim() !== '';
+    return !!t && String(t).trim() !== "";
   }
 }

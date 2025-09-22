@@ -1,16 +1,8 @@
 // projects/schema/src/lib/components/schema-links.component.ts
 // URL: projects/schema/src/lib/components/schema-links.component.ts
 
-import {
-  ChangeDetectionStrategy,
-  Component,
-  EventEmitter,
-  Input,
-  Output,
-  computed,
-  input,
-} from '@angular/core';
-import { SchemaEdge, SchemaSettings, DEFAULT_SETTINGS } from '../models';
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, computed, input } from "@angular/core";
+import { SchemaEdge, SchemaSettings, DEFAULT_SETTINGS } from "../models";
 
 /**
  * Renderiza todas las aristas del grafo en un único SVG.
@@ -20,7 +12,7 @@ import { SchemaEdge, SchemaSettings, DEFAULT_SETTINGS } from '../models';
  * - Emite `linkClick` al hacer click sobre una arista.
  */
 @Component({
-  selector: 'schema-links',
+  selector: "schema-links",
   standalone: true,
   template: `
     <svg class="schema-links" [attr.width]="width" [attr.height]="height">
@@ -81,13 +73,10 @@ export class SchemaLinksComponent {
 
     return {
       linkStroke: colors.linkStroke ?? DEFAULT_SETTINGS.colors.linkStroke,
-      linkStrokeWidth:
-        colors.linkStrokeWidth ?? DEFAULT_SETTINGS.colors.linkStrokeWidth,
+      linkStrokeWidth: colors.linkStrokeWidth ?? DEFAULT_SETTINGS.colors.linkStrokeWidth,
       linkStyle: layout.linkStyle ?? DEFAULT_SETTINGS.layout.linkStyle, // 'orthogonal' | 'curve' | 'line'
       curveTension: layout.curveTension ?? DEFAULT_SETTINGS.layout.curveTension, // 20–200 sugerido
-      straightThresholdDx:
-        layout.straightThresholdDx ??
-        DEFAULT_SETTINGS.layout.straightThresholdDx,
+      straightThresholdDx: layout.straightThresholdDx ?? DEFAULT_SETTINGS.layout.straightThresholdDx,
     } as const;
   });
 
@@ -102,18 +91,18 @@ export class SchemaLinksComponent {
    */
   pathFor(e: SchemaEdge): string {
     const pts = e.points ?? [];
-    if (pts.length === 0) return '';
+    if (pts.length === 0) return "";
 
     const v = this.view();
     const style = v.linkStyle;
 
-    if (style === 'line') {
+    if (style === "line") {
       const a = pts[0];
       const b = pts[pts.length - 1];
       return `M ${a.x},${a.y} L ${b.x},${b.y}`;
     }
 
-    if (style === 'curve') {
+    if (style === "curve") {
       const a = pts[0];
       const b = pts[pts.length - 1];
 
@@ -143,9 +132,7 @@ export class SchemaLinksComponent {
     // 'orthogonal' (o fallback): usa todos los puntos como segmentos
     if (pts.length === 1) return `M ${pts[0].x},${pts[0].y}`;
     const [first, ...rest] = pts;
-    return `M ${first.x},${first.y} ${rest
-      .map((p) => `L ${p.x},${p.y}`)
-      .join(' ')}`;
+    return `M ${first.x},${first.y} ${rest.map((p) => `L ${p.x},${p.y}`).join(" ")}`;
   }
 
   /** Maneja el click en la arista sin burbujarlo al stage. */

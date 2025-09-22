@@ -301,7 +301,7 @@ export const DEFAULT_SETTINGS: Required<SchemaSettings> = {
     defaultNodeSize: { width: 256, height: 64 },
 
     // c) Interacción
-    enableCollapse: false,
+    enableCollapse: true,
 
     // d) Medición
     autoResizeCards: true,

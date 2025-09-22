@@ -1,14 +1,8 @@
 // projects/schema/src/lib/services/json-adapter.service.ts
 // URL: projects/schema/src/lib/services/json-adapter.service.ts
 
-import { Injectable } from '@angular/core';
-import {
-  DEFAULT_SETTINGS,
-  NormalizedGraph,
-  SchemaEdge,
-  SchemaNode,
-  SchemaSettings,
-} from '../models';
+import { Injectable } from "@angular/core";
+import { DEFAULT_SETTINGS, NormalizedGraph, SchemaEdge, SchemaNode, SchemaSettings } from "../models";
 
 /**
  * Convierte un JSON arbitrario en un grafo normalizado (nodos + aristas).
@@ -21,7 +15,7 @@ import {
  * - Se preserva el orden de hermanos en `jsonMeta.childOrder`.
  * - Se anotan `childrenCount` y `arrayCounts` por nodo.
  */
-@Injectable({ providedIn: 'root' })
+@Injectable({ providedIn: "root" })
 export class JsonAdapterService {
   /**
    * Convierte un input JSON en {@link NormalizedGraph}.
@@ -57,8 +51,7 @@ export class JsonAdapterService {
     // Valores efectivos (linter-safe)
     const titleKeyPriority = dv.titleKeyPriority ?? [];
     const hiddenKeysGlobal: string[] = dv.hiddenKeysGlobal ?? [];
-    const treatScalarArraysAsAttribute =
-      dv.treatScalarArraysAsAttribute ?? false;
+    const treatScalarArraysAsAttribute = dv.treatScalarArraysAsAttribute ?? false;
     const previewMaxKeys = dv.previewMaxKeys ?? 999;
     const defaultNodeSize = dv.defaultNodeSize ?? { width: 256, height: 64 };
     const maxDepth = dv.maxDepth ?? null;
@@ -68,11 +61,9 @@ export class JsonAdapterService {
     const edges: SchemaEdge[] = [];
 
     // === helpers ===
-    const isScalar = (v: unknown): boolean =>
-      v === null || ['string', 'number', 'boolean'].includes(typeof v);
+    const isScalar = (v: unknown): boolean => v === null || ["string", "number", "boolean"].includes(typeof v);
 
-    const arrayIsScalar = (arr: unknown[]): boolean =>
-      Array.isArray(arr) && arr.length > 0 && arr.every(isScalar);
+    const arrayIsScalar = (arr: unknown[]): boolean => Array.isArray(arr) && arr.length > 0 && arr.every(isScalar);
 
     /**
      * Selecciona título para una card.
@@ -80,14 +71,11 @@ export class JsonAdapterService {
      * - Si no hay, usa el primer escalar del objeto.
      * - Si no existe, devuelve "Item".
      */
-    const pickTitle = (
-      obj: any,
-      priorities: string[]
-    ): { title: string; usedKey?: string } => {
+    const pickTitle = (obj: any, priorities: string[]): { title: string; usedKey?: string } => {
       if (Array.isArray(priorities) && priorities.length > 0) {
         for (const k of priorities) {
           const v = obj?.[k];
-          if (v != null && String(v).trim() !== '') {
+          if (v != null && String(v).trim() !== "") {
             return { title: String(v), usedKey: k };
           }
         }
@@ -96,11 +84,11 @@ export class JsonAdapterService {
       for (const [k, v] of Object.entries(obj ?? {})) {
         if (v == null) continue;
         const t = typeof v;
-        if (t === 'string' || t === 'number' || t === 'boolean') {
+        if (t === "string" || t === "number" || t === "boolean") {
           return { title: String(v), usedKey: k };
         }
       }
-      return { title: '', usedKey: undefined };
+      return { title: "", usedKey: undefined };
     };
 
     /**
@@ -116,10 +104,7 @@ export class JsonAdapterService {
      * // showTitle = false -> incluye 'nivel' y 'se_muestra' en el preview
      * // showTitle = true  -> si usedKey="nivel", NO incluye 'nivel' en el preview
      */
-    const buildPreviewAttributes = (
-      obj: any,
-      usedKey?: string
-    ): Record<string, any> => {
+    const buildPreviewAttributes = (obj: any, usedKey?: string): Record<string, any> => {
       const entries: [string, any][] = [];
       for (const [k, v] of Object.entries(obj ?? {})) {
         if (hiddenKeysGlobal.includes(k)) continue;
@@ -129,26 +114,20 @@ export class JsonAdapterService {
 
         if (isScalar(v)) {
           entries.push([k, v]);
-        } else if (
-          Array.isArray(v) &&
-          treatScalarArraysAsAttribute &&
-          arrayIsScalar(v)
-        ) {
-          entries.push([k, v.join(', ')]);
+        } else if (Array.isArray(v) && treatScalarArraysAsAttribute && arrayIsScalar(v)) {
+          entries.push([k, v.join(", ")]);
         }
       }
       return Object.fromEntries(entries.slice(0, previewMaxKeys));
     };
 
     const isEntity = (obj: unknown): obj is Record<string, unknown> => {
-      if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
+      if (!obj || typeof obj !== "object" || Array.isArray(obj)) return false;
       return Object.values(obj).some(isScalar);
     };
 
     /** Tamaños de arrays no escalares por clave. */
-    const arrayCountsOf = (
-      obj: Record<string, unknown>
-    ): Record<string, number> => {
+    const arrayCountsOf = (obj: Record<string, unknown>): Record<string, number> => {
       const out: Record<string, number> = {};
       for (const [k, v] of Object.entries(obj)) {
         if (Array.isArray(v) && !(v.length > 0 && v.every(isScalar))) {
@@ -165,11 +144,7 @@ export class JsonAdapterService {
     /**
      * Crea un nodo y su arista con el padre (si corresponde).
      */
-    const addNode = (
-      jsonPath: string,
-      obj: Record<string, unknown>,
-      parentId?: string
-    ): string => {
+    const addNode = (jsonPath: string, obj: Record<string, unknown>, parentId?: string): string => {
       const { title, usedKey } = pickTitle(obj, titleKeyPriority);
       const attrs = buildPreviewAttributes(obj, usedKey);
 
@@ -211,31 +186,22 @@ export class JsonAdapterService {
     /**
      * Recorrido recursivo de construcción de grafo.
      */
-    const traverse = (
-      val: unknown,
-      path: string,
-      parentId?: string,
-      depth = 0
-    ) => {
-      if (maxDepth !== null && maxDepth !== undefined && depth > maxDepth)
-        return;
+    const traverse = (val: unknown, path: string, parentId?: string, depth = 0) => {
+      if (maxDepth !== null && maxDepth !== undefined && depth > maxDepth) return;
 
       if (Array.isArray(val)) {
-        val.forEach((c, i) =>
-          traverse(c, `${path}[${i}]`, parentId, depth + 1)
-        );
+        val.forEach((c, i) => traverse(c, `${path}[${i}]`, parentId, depth + 1));
         return;
       }
 
-      if (val && typeof val === 'object') {
+      if (val && typeof val === "object") {
         const obj = val as Record<string, unknown>;
 
         // Entidad → nodo
         let myId = parentId;
         if (isEntity(obj)) {
           myId = addNode(path, obj, parentId);
-          if (parentId)
-            childCounter.set(parentId, (childCounter.get(parentId) ?? 0) + 1);
+          if (parentId) childCounter.set(parentId, (childCounter.get(parentId) ?? 0) + 1);
         }
 
         // Recorre hijos no escalares
@@ -245,9 +211,7 @@ export class JsonAdapterService {
           if (Array.isArray(v)) {
             const scalarArr = v.length > 0 && v.every(isScalar);
             if (scalarArr && treatScalarArraysAsAttribute) continue;
-            v.forEach((c, i) =>
-              traverse(c, `${path}.${k}[${i}]`, myId, depth + 1)
-            );
+            v.forEach((c, i) => traverse(c, `${path}.${k}[${i}]`, myId, depth + 1));
           } else {
             traverse(v, `${path}.${k}`, myId, depth + 1);
           }
@@ -256,7 +220,7 @@ export class JsonAdapterService {
     };
 
     // Inicio en raíz
-    traverse(input, '$', undefined, 0);
+    traverse(input, "$", undefined, 0);
 
     // childrenCount finales
     nodes.forEach((n) => {
