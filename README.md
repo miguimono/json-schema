@@ -249,3 +249,7 @@ Si ya creaste `node_modules` dentro de los subproyectos, bórralos y vuelve a in
 rm -rf projects/schema-ng19/node_modules projects/schema-ng16/node_modules
 npm install
 ```
+
+## Licencia
+
+MIT — Copyright (c) 2026 Miguimono

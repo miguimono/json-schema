@@ -56,5 +56,6 @@
     "tslib": "^2.3.0",
     "typescript": "~5.5.4",
     "zone.js": "~0.15.0"
-  }
+  },
+  "license": "MIT"
 }
