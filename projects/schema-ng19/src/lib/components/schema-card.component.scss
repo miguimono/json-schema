@@ -1,0 +1,158 @@
+@use "../shared/styles/tokens" as t;
+@use "../shared/styles/mixins" as m;
+
+.schema-card {
+  border-radius: t.$radius-card;
+  border: 1px solid t.$color-border;
+  background: t.$color-card-bg;
+  box-shadow: t.$shadow-card;
+  user-select: none;
+  box-sizing: border-box;
+  word-break: normal;
+  overflow-wrap: normal;
+  overflow: hidden;
+  @include m.card-transition;
+}
+.collapse-btn {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: t.$radius-btn;
+  border: 1px solid t.$color-border-strong;
+  background: #f8fafc;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  line-height: 1;
+  z-index: 2;
+  span {
+    font-size: 0.5rem;
+  }
+}
+.chev {
+  display: inline-block;
+  transition: transform t.$dur-med t.$ease-standard;
+}
+.chev.collapsed {
+  transform: rotate(180deg);
+}
+/* Cuerpo y disposición interna */
+.card-body {
+  padding: t.$pad-card-y t.$pad-card-x;
+}
+.card-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.card-col {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Miniatura (grupo de imagen) */
+.thumb {
+  flex: 0 0 auto;
+  display: block;
+  object-fit: contain;
+  background: t.$color-thumb-bg;
+  border: 1px solid t.$color-border-light;
+}
+.shape-square {
+  border-radius: t.$radius-thumb-square;
+}
+.shape-rounded {
+  border-radius: t.$radius-thumb-rounded;
+}
+.shape-circle {
+  border-radius: t.$radius-thumb-circle;
+}
+
+/* Tipografía y vista previa */
+.card-title {
+  font-weight: 700;
+  font-size: t.$font-title;
+  margin-bottom: 6px;
+}
+.card-preview {
+  font-size: t.$font-k;
+  line-height: t.$line-normal;
+}
+.kv {
+  display: grid;
+  grid-template-columns: max-content max-content;
+  column-gap: 10px;
+  align-items: baseline;
+  margin: 3px 0;
+  padding-right: 8px;
+}
+.k {
+  opacity: 0.66;
+  font-weight: 600;
+  font-size: t.$font-k;
+}
+.v {
+  font-size: t.$font-v;
+  line-height: t.$line-tight;
+  letter-spacing: 0.1px;
+  padding-right: 6px;
+  display: inline-block;
+}
+.v-true {
+  color: t.$color-true;
+  font-weight: 700;
+}
+.v-false {
+  color: t.$color-false;
+  font-weight: 700;
+}
+.v-null {
+  color: t.$color-null;
+  font-weight: 700;
+}
+/* Badges de arrays */
+.array-badges {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.arr-badge {
+  font-size: t.$font-badge;
+  background: t.$color-badge-bg;
+  color: t.$color-badge-text;
+  padding: 2px 6px;
+  border-radius: t.$radius-badge;
+}
+/* No wrap para claves específicas */
+.nowrap {
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+}
+
+/* Clases de acento (borde y/o relleno) */
+.schema-card.accent-true {
+  border-color: t.$color-true;
+  box-shadow: t.$shadow-true;
+}
+.schema-card.accent-false {
+  border-color: t.$color-false;
+  box-shadow: t.$shadow-false;
+}
+.schema-card.accent-null {
+  border-color: t.$color-null;
+  box-shadow: t.$shadow-null;
+}
+.schema-card.accent-fill-true {
+  background: rgba(22, 163, 74, 0.1);
+}
+.schema-card.accent-fill-false {
+  background: rgba(220, 38, 38, 0.1);
+}
+.schema-card.accent-fill-null {
+  background: rgba(107, 114, 128, 0.12);
+}

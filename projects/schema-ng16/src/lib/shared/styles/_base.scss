@@ -1,0 +1,32 @@
+@use "./tokens" as t;
+
+%btn-reset {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+}
+
+%select-reset {
+  border: 0;
+  background: transparent;
+  appearance: none;
+  font: inherit;
+  color: inherit;
+}
+
+%panel {
+  border-radius: t.$radius-toolbar;
+  border: 1px solid t.$color-border-light;
+  box-shadow: t.$shadow-toolbar;
+}
+
+%banner {
+  pointer-events: auto;
+  border-radius: t.$radius-toolbar;
+  padding: t.$pad-banner-y t.$pad-banner-x;
+  box-shadow: t.$shadow-banner;
+  font-weight: 600;
+}

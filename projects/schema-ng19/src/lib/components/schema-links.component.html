@@ -1,0 +1,13 @@
+<svg class="schema-links" [attr.width]="width" [attr.height]="height">
+  <g>
+    @for (e of edges(); track e.id) {
+    <path
+      [attr.d]="pathFor(e)"
+      [attr.stroke]="view().linkStroke"
+      [attr.stroke-width]="view().linkStrokeWidth"
+      fill="none"
+      (click)="onLinkClick(e, $event)"
+    ></path>
+    }
+  </g>
+</svg>

@@ -1,0 +1,152 @@
+/* URL: projects/schema-ng19/src/lib/components/schema.component.scss */
+@use "../shared/styles/tokens" as t;
+@use "../shared/styles/mixins" as m;
+@use "../shared/styles/base" as *;
+.schema-root {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  background: t.$color-root-bg;
+  border-radius: t.$radius-root;
+}
+
+.schema-toolbar {
+  position: absolute;
+  inset: t.$toolbar-inset t.$toolbar-inset auto t.$toolbar-inset;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: t.$toolbar-gap-y t.$toolbar-gap-x;
+  background: t.$color-toolbar-bg;
+  @extend %panel;
+  padding: t.$pad-toolbar-y t.$pad-toolbar-x;
+  box-shadow: t.$shadow-toolbar;
+}
+.toolbar-actions {
+  display: inline-flex;
+  gap: t.$toolbar-gap-y;
+  align-items: center;
+}
+.toolbar-actions button {
+  @extend %btn-reset;
+  min-width: t.$toolbar-btn-size;
+  height: t.$toolbar-btn-size;
+  border-radius: t.$radius-toolbar-btn;
+  border: 1px solid t.$color-border-strong;
+  background: t.$color-toolbar-btn-bg;
+  font-weight: 600;
+  font-size: t.$font-ui;
+  line-height: t.$line-ui;
+  cursor: pointer;
+}
+.toolbar-selectors {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+}
+.toolbar-selectors select {
+  @extend %select-reset;
+  height: t.$toolbar-select-height;
+  border-radius: t.$radius-toolbar-select;
+  border: 1px solid t.$color-border-strong;
+  background: t.$color-toolbar-select-bg;
+  padding: 0 t.$toolbar-select-pad-x;
+  cursor: pointer;
+  font-size: t.$font-ui-small;
+  line-height: t.$line-ui;
+}
+@media (max-width: 768px) {
+  .schema-toolbar {
+    grid-template-columns: 1fr;
+    grid-auto-rows: auto;
+  }
+  .toolbar-actions {
+    order: 1;
+    justify-content: flex-start;
+  }
+  .toolbar-selectors {
+    order: 2;
+    justify-content: stretch;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+  }
+}
+@media (max-width: 600px) {
+  .toolbar-selectors {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .toolbar-selectors label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .toolbar-selectors select {
+    width: 100%;
+  }
+}
+
+/* El lienzo capta gestos; el root queda "limpio" para la toolbar */
+.stage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: t.$stage-width;
+  height: t.$stage-height;
+  transform-origin: 0 0;
+  touch-action: none; /* capta pan/zoom sin interferir con la toolbar */
+  -ms-touch-action: none;
+  overscroll-behavior: contain;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 10;
+  pointer-events: none;
+}
+.loading-banner,
+.empty-banner,
+.error-banner {
+  @extend %banner;
+  font-size: t.$font-ui;
+  line-height: t.$line-ui;
+}
+.loading .loading-banner {
+  width: min(720px, 90%);
+  background: t.$color-loading-bg;
+  position: relative;
+  overflow: hidden;
+  color: t.$color-loading-text;
+}
+.loading .msg {
+  position: relative;
+  z-index: 1;
+}
+.loading .shimmer {
+  position: absolute;
+  inset: 0;
+  @include m.shimmer-bg;
+  background-size: 1000px 100%;
+  animation: shimmer t.$shimmer-duration infinite linear;
+  opacity: 0.9;
+}
+@include m.shimmer-keyframes;
+.empty .empty-banner {
+  background: t.$color-empty-bg;
+  border: t.$border-dash-empty t.$color-empty-border;
+  color: t.$color-empty-text;
+}
+.error .error-banner {
+  background: t.$color-error-bg;
+  border: 1px solid t.$color-error-border;
+  color: t.$color-error-text;
+}

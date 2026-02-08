@@ -1,0 +1,12 @@
+<svg class="schema-links" [attr.width]="_width()" [attr.height]="_height()">
+  <g>
+    <path
+      *ngFor="let e of edges(); trackBy: trackEdgeId"
+      [attr.d]="pathFor(e)"
+      [attr.stroke]="view().linkStroke"
+      [attr.stroke-width]="view().linkStrokeWidth"
+      fill="none"
+      (click)="onLinkClick(e, $event)"
+    />
+  </g>
+</svg>

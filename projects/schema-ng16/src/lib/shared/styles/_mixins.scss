@@ -1,0 +1,25 @@
+@use "./tokens" as t;
+
+@mixin card-transition {
+  transition: left 160ms ease, top 160ms ease, opacity 120ms ease;
+}
+
+@mixin shimmer-bg {
+  background: linear-gradient(
+    to right,
+    t.$color-loading-shimmer-a 8%,
+    t.$color-loading-shimmer-b 18%,
+    t.$color-loading-shimmer-a 33%
+  );
+}
+
+@mixin shimmer-keyframes($name: shimmer) {
+  @keyframes #{$name} {
+    0% {
+      background-position: -1000px 0;
+    }
+    100% {
+      background-position: 1000px 0;
+    }
+  }
+}

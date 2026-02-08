@@ -1,0 +1,93 @@
+$color-black: #000;
+$color-white: #fff;
+
+$color-border: rgba(0, 0, 0, 0.08);
+$color-border-strong: rgba(0, 0, 0, 0.12);
+$color-border-light: rgba(0, 0, 0, 0.06);
+
+$color-card-bg: $color-white;
+$color-thumb-bg: transparent;
+$color-thumb-fallback: #e2e8f0;
+
+$color-root-bg: #f7f9fb;
+$color-toolbar-bg: rgba(255, 255, 255, 0.9);
+$color-toolbar-btn-bg: #f7f9fb;
+$color-toolbar-select-bg: #f9fafb;
+
+$color-loading-bg: #eee;
+$color-loading-text: #374151;
+$color-loading-shimmer-a: #e0e0e0;
+$color-loading-shimmer-b: #f0f0f0;
+
+$color-empty-bg: $color-white;
+$color-empty-border: #cbd5e1;
+$color-empty-text: #475569;
+
+$color-error-bg: #fff1f2;
+$color-error-border: #fecdd3;
+$color-error-text: #b91c1c;
+
+$color-true: #16a34a;
+$color-false: #dc2626;
+$color-null: #6b7280;
+
+$color-badge-bg: #eef2ff;
+$color-badge-text: #3730a3;
+
+$shadow-card: 0 2px 8px rgba(0, 0, 0, 0.08);
+$shadow-toolbar: 0 2px 8px rgba(0, 0, 0, 0.08);
+$shadow-banner: 0 6px 20px rgba(0, 0, 0, 0.08);
+$shadow-true: 0 2px 10px rgba(22, 163, 74, 0.15);
+$shadow-false: 0 2px 10px rgba(220, 38, 38, 0.15);
+$shadow-null: 0 2px 10px rgba(107, 114, 128, 0.18);
+
+$dur-fast: 120ms;
+$dur-med: 160ms;
+$dur-slow: 260ms;
+
+$ease-standard: ease;
+$ease-in-out: ease-in-out;
+
+$stage-width: 12000px;
+$stage-height: 6000px;
+
+$toolbar-gap-x: 12px;
+$toolbar-gap-y: 8px;
+$toolbar-inset: 12px;
+
+$border-dash-empty: 1px dashed;
+
+$shimmer-duration: 3s;
+$radius-root: 8px;
+$radius-card: 12px;
+$radius-toolbar: 10px;
+$radius-toolbar-btn: 8px;
+$radius-toolbar-select: 6px;
+$radius-btn: 6px;
+$radius-badge: 999px;
+$radius-thumb-square: 4px;
+$radius-thumb-rounded: 8px;
+$radius-thumb-circle: 999px;
+
+$font-title: 14px;
+$font-k: 12px;
+$font-v: 10.75px;
+$font-badge: 10px;
+$font-ui: 13px;
+$font-ui-small: 12px;
+
+$line-tight: 1.25;
+$line-normal: 1.28;
+$line-ui: 1.2;
+
+$pad-card-y: 12px;
+$pad-card-x: 20px;
+
+$toolbar-btn-size: 32px;
+$toolbar-select-height: 28px;
+$toolbar-select-pad-x: 6px;
+
+$pad-toolbar-y: 8px;
+$pad-toolbar-x: 12px;
+$pad-banner-y: 16px;
+$pad-banner-x: 20px;

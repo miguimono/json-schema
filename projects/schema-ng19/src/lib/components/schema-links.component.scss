@@ -1,0 +1,13 @@
+@use "../shared/styles/tokens" as t;
+
+.schema-links {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: auto;
+  overflow: visible;
+  z-index: 0; /* Render por debajo de las cards */
+}
+path {
+  cursor: pointer;
+}

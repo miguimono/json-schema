@@ -1,31 +1,60 @@
 {
-  "name": "library-schema",
-  "private": true,
-  "version": "0.0.1",
+  "name": "@miguimono/json-schema",
+  "private": false,
+  "version": "2.0.0",
   "scripts": {
-    "ng": "ng",
-    "build": "ng build schema",
-    "watch": "ng build schema --watch --configuration development",
-    "test": "ng test"
+    "sync:versions": "node scripts/sync-versions.js",
+    "sync:shared": "node scripts/sync-shared.js",
+    "check:shared": "node scripts/check-shared.js",
+    "clean:dist": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build:schema-ng19": "npm run sync:shared && npm run sync:versions && npx ng build schema-ng19",
+    "build:schema-ng16": "npm run sync:shared && npm run sync:versions && npx ng build schema-ng16",
+    "build": "npm run clean:dist && npm run build:schema-ng19 && npm run build:schema-ng16",
+    "prepack": "npm run sync:shared && npm run sync:versions",
+    "pack": "npm run build && npm pack"
   },
-  "dependencies": {
-    "d3-zoom": "^3.0.0",
-    "elkjs": "^0.10.0",
-    "rxjs": "~7.8.0",
-    "tslib": "^2.3.0"
+  "files": [
+    "dist/**",
+    "README.md",
+    "LICENSE",
+    "package.json"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/schema/index.d.ts",
+      "default": "./dist/schema/fesm2022/json-schema.mjs"
+    },
+    "./ng16": {
+      "types": "./dist/schema/ng16/public-api.d.ts",
+      "default": "./dist/schema/ng16/fesm2022/json-schema-ng16.mjs"
+    },
+    "./ng19": {
+      "types": "./dist/schema/index.d.ts",
+      "default": "./dist/schema/fesm2022/json-schema.mjs"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "ng16": [
+        "dist/schema/ng16/public-api.d.ts"
+      ],
+      "ng19": [
+        "dist/schema/index.d.ts"
+      ]
+    }
   },
   "devDependencies": {
-    "@angular/cli": "^19.2.5",
-    "@angular/compiler-cli": "^19.2.0",
-    "@angular-devkit/build-angular": "^19.2.5",
-    "ng-packagr": "^19.1.0",
-    "typescript": "~5.7.2",
-    "@types/jasmine": "~5.1.0",
-    "jasmine-core": "~5.7.0",
-    "karma": "~6.4.0",
-    "karma-chrome-launcher": "~3.2.0",
-    "karma-coverage": "~2.2.0",
-    "karma-jasmine": "~5.1.0",
-    "karma-jasmine-html-reporter": "~2.1.0"
+    "@angular/cli": "^19.2.18",
+    "@angular/common": "^19.2.18",
+    "@angular/compiler": "^19.2.18",
+    "@angular/compiler-cli": "^19.2.18",
+    "@angular/core": "^19.2.18",
+    "@angular-devkit/build-angular": "^19.2.18",
+    "@angular/cdk": "^19.2.18",
+    "ng-packagr": "^19.2.0",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0",
+    "typescript": "~5.5.4",
+    "zone.js": "~0.15.0"
   }
 }

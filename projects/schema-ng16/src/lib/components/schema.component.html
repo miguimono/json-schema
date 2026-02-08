@@ -1,0 +1,89 @@
+<!-- URL: projects/schema-ng16/src/lib/components/schema.component.html -->
+<div class="schema-root" #root [style.height.px]="viewportHeight()" [style.minHeight.px]="minViewportHeight()">
+  <div class="schema-toolbar" *ngIf="showToolbar() && !isLoadingView() && !isErrorView()">
+    <div class="toolbar-actions">
+      <button type="button" (click)="zoomOut()" title="Zoom out">−</button>
+      <button type="button" (click)="zoomIn()" title="Zoom in">+</button>
+      <button type="button" (click)="resetView()" title="Centrar">⤾</button>
+    </div>
+
+    <div class="toolbar-selectors">
+      <label *ngIf="toolbarShowLinkStyle()">
+        Enlaces:
+        <select #ls [value]="opt_linkStyle()" (change)="setLinkStyle(ls.value)">
+          <option value="curve">Curvo</option>
+          <option value="orthogonal">Ortogonal</option>
+          <option value="line">Lineal</option>
+        </select>
+      </label>
+
+      <label *ngIf="toolbarShowLayoutAlign()">
+        Alineación:
+        <select #la [value]="opt_layoutAlign()" (change)="setLayoutAlign(la.value)">
+          <option value="firstChild">Superior</option>
+          <option value="center">Centrado</option>
+        </select>
+      </label>
+
+      <label *ngIf="toolbarShowLayoutDirection()">
+        Dirección:
+        <select #ld [value]="opt_layoutDirection()" (change)="setLayoutDirection(ld.value)">
+          <option value="RIGHT">Derecha</option>
+          <option value="DOWN">Abajo</option>
+        </select>
+      </label>
+    </div>
+  </div>
+
+  <!-- Overlays -->
+  <div class="overlay loading" *ngIf="isLoadingView()">
+    <div class="loading-banner">
+      <div class="shimmer"></div>
+      <span class="msg">{{ loadingMessageView() }}</span>
+    </div>
+  </div>
+
+  <div class="overlay empty" *ngIf="!isLoadingView() && data == null">
+    <div class="empty-banner">{{ emptyMessageView() }}</div>
+  </div>
+
+  <div class="overlay error" *ngIf="!isLoadingView() && isErrorView()">
+    <div class="error-banner">{{ errorMessageView() }}</div>
+  </div>
+
+  <!-- Stage -->
+  <div
+    class="stage"
+    (wheel)="onWheel($event)"
+    (pointerdown)="onPointerDown($event)"
+    (pointermove)="onPointerMove($event)"
+    (pointerup)="onPointerUp()"
+    (pointerleave)="onPointerLeave()"
+    (dblclick)="onDblClick()"
+    [style.transform]="transform()"
+    [style.width.px]="virtualWidth"
+    [style.height.px]="virtualHeight"
+    *ngIf="!isLoadingView() && !isErrorView()"
+  >
+    <schema-links
+      [edges]="edges()"
+      [settings]="effectiveSettings()"
+      (linkClick)="linkClick.emit($event)"
+      [width]="virtualWidth"
+      [height]="virtualHeight"
+    ></schema-links>
+
+    <ng-container *ngFor="let n of nodes(); trackBy: trackByNodeId">
+      <schema-card
+        [node]="n"
+        [settings]="effectiveSettings()"
+        [cardTemplate]="cardTemplate()"
+        [hasChildren]="hasChildren(n.id)"
+        [showCollapseControls]="enableCollapse()"
+        [isCollapsed]="isNodeCollapsed(n.id)"
+        (toggleRequest)="onCardToggle($event)"
+        (nodeClick)="nodeClick.emit($event)"
+      ></schema-card>
+    </ng-container>
+  </div>
+</div>

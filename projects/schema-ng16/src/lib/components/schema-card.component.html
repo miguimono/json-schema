@@ -1,0 +1,91 @@
+<div
+  class="schema-card"
+  [attr.data-node-id]="node()?.id ?? ''"
+  [ngClass]="getAccentClasses()"
+  [style.left.px]="node()?.x ?? 0"
+  [style.top.px]="node()?.y ?? 0"
+  [style.width.px]="node()?.width ?? view().defaultNodeW"
+  [style.height.px]="node()?.height ?? view().defaultNodeH"
+  [style.maxWidth.px]="view().maxCardWidth"
+  [style.maxHeight.px]="view().maxCardHeight"
+  (click)="onClick($event)"
+  style="z-index: 1; position: absolute;"
+>
+  <button
+    *ngIf="showCollapseControls() && hasChildren()"
+    type="button"
+    class="collapse-btn"
+    [attr.aria-pressed]="isCollapsed()"
+    (click)="onToggle($event)"
+    [attr.title]="isCollapsed() ? 'Expandir' : 'Colapsar'"
+  >
+    <span class="chev">{{ arrowGlyph() }}</span>
+  </button>
+
+  <!-- Template externo opcional -->
+  <ng-container
+    *ngIf="cardTemplate(); else defaultTpl"
+    [ngTemplateOutlet]="cardTemplate()"
+    [ngTemplateOutletContext]="{ $implicit: node() }"
+  ></ng-container>
+
+  <!-- Template por defecto -->
+  <ng-template #defaultTpl>
+    <div class="card-body">
+      <div class="card-row">
+        <!-- Miniatura opcional -->
+        <img
+          *ngIf="imageSrc() as src"
+          class="thumb"
+          [class.shape-square]="view().imageShape === 'square'"
+          [class.shape-rounded]="view().imageShape === 'rounded'"
+          [class.shape-circle]="view().imageShape === 'circle'"
+          [attr.width]="view().imageSizePx"
+          [attr.height]="view().imageSizePx"
+          [style.width.px]="view().imageSizePx"
+          [style.height.px]="view().imageSizePx"
+          [style.background]="view().imageBg ?? null"
+          [style.border]="view().imageBorder ? '1px solid rgba(0,0,0,0.06)' : 'none'"
+          [style.object-fit]="view().imageFit"
+          [src]="src"
+          [alt]="imageAlt()"
+          loading="lazy"
+          decoding="async"
+          (error)="onImgError($event)"
+        />
+
+        <div class="card-col">
+          <div class="card-title" *ngIf="hasComputedTitle()">
+            {{ node()?.jsonMeta?.title }}
+          </div>
+
+          <!-- Vista previa de atributos -->
+          <div class="card-preview" *ngIf="node()?.jsonMeta?.attributes as attrs">
+            <div *ngFor="let kv of objToPairs(attrs)" class="kv">
+              <span class="k">{{ displayKey(kv[0]) }}:</span>
+              <span
+                class="v"
+                [class.v-true]="kv[1] === true"
+                [class.v-false]="kv[1] === false"
+                [class.v-null]="kv[1] === null"
+                [class.nowrap]="isNoWrapKey(kv[0])"
+                [attr.title]="valueTitle(kv[1])"
+              >
+                {{ displayValue(kv[1]) }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Badges con conteos de arrays no escalares -->
+          <div class="array-badges" *ngIf="node()?.jsonMeta?.arrayCounts as arrs">
+            <ng-container *ngFor="let e of objToPairs(arrs)">
+              <span class="arr-badge">
+                {{ displayKey(e[0]) }}: {{ e[1] }} {{ e[1] === 1 ? "item" : "items" }}
+              </span>
+            </ng-container>
+          </div>
+        </div>
+      </div>
+    </div>
+  </ng-template>
+</div>

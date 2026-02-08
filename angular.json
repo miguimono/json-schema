@@ -3,23 +3,23 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
-    "schema": {
+    "schema-ng19": {
       "projectType": "library",
-      "root": "projects/schema",
-      "sourceRoot": "projects/schema/src",
+      "root": "projects/schema-ng19",
+      "sourceRoot": "projects/schema-ng19/src",
       "prefix": "sh",
       "architect": {
         "build": {
           "builder": "@angular-devkit/build-angular:ng-packagr",
           "options": {
-            "project": "projects/schema/ng-package.json"
+            "project": "projects/schema-ng19/ng-package.json"
           },
           "configurations": {
             "production": {
-              "tsConfig": "projects/schema/tsconfig.lib.prod.json"
+              "tsConfig": "projects/schema-ng19/tsconfig.lib.prod.json"
             },
             "development": {
-              "tsConfig": "projects/schema/tsconfig.lib.json"
+              "tsConfig": "projects/schema-ng19/tsconfig.lib.json"
             }
           },
           "defaultConfiguration": "production"
@@ -27,11 +27,26 @@
         "test": {
           "builder": "@angular-devkit/build-angular:karma",
           "options": {
-            "tsConfig": "projects/schema/tsconfig.spec.json",
+            "tsConfig": "projects/schema-ng19/tsconfig.spec.json",
             "polyfills": [
               "zone.js",
               "zone.js/testing"
             ]
+          }
+        }
+      }
+    },
+    "schema-ng16": {
+      "projectType": "library",
+      "root": "projects/schema-ng16",
+      "sourceRoot": "projects/schema-ng16/src",
+      "prefix": "app",
+      "architect": {
+        "build": {
+          "builder": "@angular-devkit/build-angular:ng-packagr",
+          "options": {
+            "project": "projects/schema-ng16/ng-package.json",
+            "tsConfig": "projects/schema-ng16/tsconfig.lib.json"
           }
         }
       }
