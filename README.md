@@ -1,5 +1,7 @@
 # JSON Schema
 
+Libreria para graficar Json
+
 Esta librería tiene **dos variantes** de build:
 
 - `projects/schema-ng19`: build principal para Angular moderno (en este repo se usa Angular 19).
