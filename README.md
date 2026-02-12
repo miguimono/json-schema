@@ -9,6 +9,14 @@ Esta librería tiene **dos variantes** de build:
 
 Ambas se construyen desde **la raíz** del repo. No necesitas instalar dependencias dentro de `projects/schema-ng19` ni `projects/schema-ng16`.
 
+## Demos de ejemplo
+
+- Librería (repo): [miguimono/json-schema](https://github.com/miguimono/json-schema)
+- Demo Angular 16 (repo): [miguimono/demo-json-schema-ng16](https://github.com/miguimono/demo-json-schema-ng16)
+- Demo Angular 16 (sitio): [miguimono.github.io/demo-json-schema-ng16](https://miguimono.github.io/demo-json-schema-ng16/)
+- Demo Angular 19 (repo): [miguimono/demo-json-schema-ng19](https://github.com/miguimono/demo-json-schema-ng19)
+- Demo Angular 19 (sitio): [miguimono.github.io/demo-json-schema-ng19](https://miguimono.github.io/demo-json-schema-ng19/)
+
 ## Requisitos y versiones
 
 - Node.js: **no hay `engines` definidos** en los `package.json`, por lo que debes usar una versión compatible con tu Angular objetivo.
