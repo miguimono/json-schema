@@ -1,6 +1,6 @@
 # JSON Schema
 
-Libreria para graficar Json
+Librería para graficar Json
 
 Esta librería tiene **dos variantes** de build:
 
