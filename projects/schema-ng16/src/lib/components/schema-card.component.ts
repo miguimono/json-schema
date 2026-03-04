@@ -71,9 +71,27 @@ export class SchemaCardComponent {
     return this._isCollapsed();
   }
 
+  private _textSelectionEnabled = signal<boolean>(false);
+  @Input("textSelectionEnabled") set textSelectionEnabledInput(value: boolean) {
+    this._textSelectionEnabled.set(!!value);
+  }
+  textSelectionEnabled() {
+    return this._textSelectionEnabled();
+  }
+
+  private _showCopyAllButton = signal<boolean>(false);
+  @Input("showCopyAllButton") set showCopyAllButtonInput(value: boolean) {
+    this._showCopyAllButton.set(!!value);
+  }
+  showCopyAllButton() {
+    return this._showCopyAllButton();
+  }
+
   /* ============================ Outputs =========================== */
   @Output() nodeClick = new EventEmitter<SchemaNode>();
   @Output() toggleRequest = new EventEmitter<SchemaNode>();
+  @Output() interactionStart = new EventEmitter<void>();
+  @Output() interactionEnd = new EventEmitter<void>();
 
   /* ============================ View derivada ===================== */
   view = computed(() => {
@@ -152,6 +170,20 @@ export class SchemaCardComponent {
     event.stopPropagation();
     const n = this.node();
     if (n) this.nodeClick.emit(n);
+  }
+
+  onPointerDown(event: PointerEvent) {
+    if (!this.textSelectionEnabled()) return;
+    event.stopPropagation();
+    this.interactionStart.emit();
+  }
+
+  onPointerEnter() {
+    this.interactionStart.emit();
+  }
+
+  onPointerLeave() {
+    this.interactionEnd.emit();
   }
 
   onToggle(event: MouseEvent) {
@@ -275,4 +307,57 @@ export class SchemaCardComponent {
     if (!this.view().imageBg) el.style.background = "#e2e8f0";
     if (this.view().imageBorder === undefined) el.style.border = "1px solid rgba(0,0,0,0.06)";
   }
+
+  onCopyAll(event: MouseEvent): void {
+    event.stopPropagation();
+    const text = this.buildCopyText();
+    if (!text) return;
+    this.copyToClipboard(text);
+  }
+
+  private buildCopyText(): string {
+    const n = this.node();
+    if (!n) return "";
+
+    const lines: string[] = [];
+    if (this.hasComputedTitle()) lines.push(String(n.jsonMeta?.title ?? "").trim());
+
+    const attrs = n.jsonMeta?.attributes ?? {};
+    for (const [k, v] of this.objToPairs(attrs)) {
+      lines.push(`${this.displayKey(k)}: ${this.displayValue(v)}`);
+    }
+
+    const arrs = n.jsonMeta?.arrayCounts ?? {};
+    for (const [k, v] of this.objToPairs(arrs)) {
+      lines.push(`${this.displayKey(k)}: ${v} ${Number(v) === 1 ? "item" : "items"}`);
+    }
+
+    return lines.join("\n").trim();
+  }
+
+  private async copyToClipboard(text: string): Promise<boolean> {
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch {}
+
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      ta.style.pointerEvents = "none";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+
 }

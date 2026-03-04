@@ -143,6 +143,8 @@ export class SchemaComponent implements AfterViewInit, OnChanges, OnDestroy {
   private lastPointerScreen: { x: number; y: number } | null = null;
   private wheelRaf: number | null = null;
   private pendingWheel: { deltaY: number; clientX: number; clientY: number } | null = null;
+  private textSelectionMode = signal(false);
+  private draggingState = signal(false);
 
   transform = computed(() => `translate(${this.tx()}px, ${this.ty()}px) scale(${this.scale()})`);
 
@@ -174,6 +176,16 @@ export class SchemaComponent implements AfterViewInit, OnChanges, OnDestroy {
     const b = this.baseSettings();
     return b.dataView?.enableCollapse ?? DEFAULT_SETTINGS.dataView.enableCollapse!;
   });
+  allowCardTextSelection = computed<boolean>(() => {
+    const b = this.baseSettings();
+    return b.dataView?.allowCardTextSelection ?? DEFAULT_SETTINGS.dataView.allowCardTextSelection!;
+  });
+  showCopyAllButton = computed<boolean>(() => {
+    const b = this.baseSettings();
+    return b.dataView?.showCopyAllButton ?? DEFAULT_SETTINGS.dataView.showCopyAllButton!;
+  });
+  isPanLockedByTextSelection = computed<boolean>(() => this.allowCardTextSelection() && this.textSelectionMode());
+  isDragging = computed<boolean>(() => this.draggingState());
 
   // ===== Toolbar controls visibility =====
   toolbarShowLinkStyle = computed<boolean>(() => {
@@ -420,6 +432,11 @@ export class SchemaComponent implements AfterViewInit, OnChanges, OnDestroy {
 
   // ===== Interacción (solo en .stage) =====
   onWheel(e: WheelEvent) {
+    const target = e.target as HTMLElement | null;
+    const overCard = !!target?.closest?.(".schema-card");
+    if (this.isPanLockedByTextSelection() && overCard) return;
+    if (this.isPanLockedByTextSelection() && !overCard) this.textSelectionMode.set(false);
+
     e.preventDefault();
     this.pendingWheel = { deltaY: e.deltaY, clientX: e.clientX, clientY: e.clientY };
     if (this.wheelRaf !== null) return;
@@ -447,12 +464,25 @@ export class SchemaComponent implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   onPointerDown(e: PointerEvent) {
+    const el = e.target as HTMLElement;
+    const isCardTarget = !!el?.closest?.(".schema-card");
+
+    if (this.allowCardTextSelection() && isCardTarget) {
+      this.textSelectionMode.set(true);
+      this.dragging = false;
+      this.draggingState.set(false);
+      return;
+    }
+
+    if (this.textSelectionMode()) this.textSelectionMode.set(false);
+
     e.preventDefault();
 
     this.dragging = true;
-    const el = e.target as HTMLElement;
+    this.draggingState.set(true);
     if (el && el.closest && el.closest(".collapse-btn")) {
       this.dragging = false;
+      this.draggingState.set(false);
       return;
     }
 
@@ -481,15 +511,27 @@ export class SchemaComponent implements AfterViewInit, OnChanges, OnDestroy {
 
   onPointerUp() {
     this.dragging = false;
+    this.draggingState.set(false);
   }
 
   onPointerLeave() {
     this.dragging = false;
+    this.draggingState.set(false);
     this.lastPointerScreen = null;
   }
 
   onDblClick() {
     this.centerOnFirstNodeOrFit();
+  }
+
+  onCardInteractionStart(): void {
+    if (!this.allowCardTextSelection()) return;
+    this.textSelectionMode.set(true);
+  }
+
+  onCardInteractionEnd(): void {
+    if (!this.allowCardTextSelection()) return;
+    this.textSelectionMode.set(false);
   }
 
   // ===== Toolbar actions =====

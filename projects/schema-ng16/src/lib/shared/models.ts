@@ -364,6 +364,17 @@ export interface SchemaSettings {
      */
     enableCollapse?: boolean;
 
+    /**
+     * Si `true`, al interactuar dentro de una card se habilita modo selección
+     * de texto y se bloquea temporalmente el pan sobre la card.
+     */
+    allowCardTextSelection?: boolean;
+
+    /**
+     * Si `true`, muestra un botón "Copiar" en cada card para copiar su contenido.
+     */
+    showCopyAllButton?: boolean;
+
     /* ---------- e) Medición (auto-resize) ---------- */
 
     /** Recalcula tamaño de cards tras render para ajustar al contenido. */
@@ -468,6 +479,8 @@ export const DEFAULT_SETTINGS: Required<SchemaSettings> = {
 
     /* d) Interacción */
     enableCollapse: true,
+    allowCardTextSelection: true,
+    showCopyAllButton: false,
 
     /* e) Medición */
     autoResizeCards: true,

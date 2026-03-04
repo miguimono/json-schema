@@ -51,9 +51,26 @@
     <div class="error-banner">{{ errorMessageView() }}</div>
   </div>
 
+  <div
+    class="stage-hitarea"
+    [class.stage-text-select]="isPanLockedByTextSelection()"
+    [class.stage-pan-enabled]="!isPanLockedByTextSelection()"
+    [class.stage-dragging]="isDragging()"
+    (wheel)="onWheel($event)"
+    (pointerdown)="onPointerDown($event)"
+    (pointermove)="onPointerMove($event)"
+    (pointerup)="onPointerUp()"
+    (pointerleave)="onPointerLeave()"
+    (dblclick)="onDblClick()"
+    *ngIf="!isLoadingView() && !isErrorView()"
+  ></div>
+
   <!-- Stage -->
   <div
     class="stage"
+    [class.stage-text-select]="isPanLockedByTextSelection()"
+    [class.stage-pan-enabled]="!isPanLockedByTextSelection()"
+    [class.stage-dragging]="isDragging()"
     (wheel)="onWheel($event)"
     (pointerdown)="onPointerDown($event)"
     (pointermove)="onPointerMove($event)"
@@ -81,6 +98,10 @@
         [hasChildren]="hasChildren(n.id)"
         [showCollapseControls]="enableCollapse()"
         [isCollapsed]="isNodeCollapsed(n.id)"
+        [textSelectionEnabled]="isPanLockedByTextSelection()"
+        [showCopyAllButton]="showCopyAllButton()"
+        (interactionStart)="onCardInteractionStart()"
+        (interactionEnd)="onCardInteractionEnd()"
         (toggleRequest)="onCardToggle($event)"
         (nodeClick)="nodeClick.emit($event)"
       ></schema-card>

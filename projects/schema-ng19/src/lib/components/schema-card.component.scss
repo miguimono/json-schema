@@ -13,24 +13,62 @@
   overflow: hidden;
   @include m.card-transition;
 }
-.collapse-btn {
+.schema-card.text-select-enabled {
+  -webkit-user-select: text;
+  user-select: text;
+  cursor: text;
+  box-shadow:
+    inset 0 0 0 1px rgba(14, 165, 233, 0.25),
+    t.$shadow-card;
+}
+.collapse-btn,
+.copy-all-btn {
   position: absolute;
   top: 6px;
-  right: 8px;
-  width: 24px;
-  height: 24px;
   border-radius: t.$radius-btn;
   border: 1px solid t.$color-border-strong;
   background: #f8fafc;
   cursor: pointer;
   display: grid;
   place-items: center;
-  padding: 0;
   line-height: 1;
   z-index: 2;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    background-color 120ms ease;
+  &:hover {
+    background: #f1f5f9;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.16);
+  }
+  &:active {
+    transform: translateY(1px) scale(0.96);
+    box-shadow: 0 0 0 rgba(15, 23, 42, 0);
+    background: #e2e8f0;
+  }
+  &:focus-visible {
+    outline: 2px solid rgba(14, 165, 233, 0.55);
+    outline-offset: 1px;
+  }
+}
+.collapse-btn {
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
   span {
     font-size: 0.5rem;
   }
+}
+.copy-all-btn {
+  right: 36px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  font-size: 14px;
+}
+.schema-card.no-collapse .copy-all-btn {
+  right: 8px;
 }
 .chev {
   display: inline-block;
@@ -100,6 +138,16 @@
   letter-spacing: 0.1px;
   padding-right: 6px;
   display: inline-block;
+  cursor: inherit;
+}
+.schema-card.text-select-enabled .k {
+  -webkit-user-select: none;
+  user-select: none;
+}
+.schema-card.text-select-enabled .v {
+  -webkit-user-select: text;
+  user-select: text;
+  cursor: text;
 }
 .v-true {
   color: t.$color-true;

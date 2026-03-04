@@ -2,15 +2,31 @@
   class="schema-card"
   [attr.data-node-id]="node()?.id ?? ''"
   [ngClass]="getAccentClasses()"
+  [class.text-select-enabled]="textSelectionEnabled()"
+  [class.no-collapse]="!(showCollapseControls() && hasChildren())"
   [style.left.px]="node()?.x ?? 0"
   [style.top.px]="node()?.y ?? 0"
   [style.width.px]="node()?.width ?? view().defaultNodeW"
   [style.height.px]="node()?.height ?? view().defaultNodeH"
   [style.maxWidth.px]="view().maxCardWidth"
   [style.maxHeight.px]="view().maxCardHeight"
+  (pointerenter)="onPointerEnter()"
+  (pointerleave)="onPointerLeave()"
+  (pointerdown)="onPointerDown($event)"
   (click)="onClick($event)"
   style="z-index: 1; position: absolute;"
 >
+  <button
+    *ngIf="showCopyAllButton()"
+    type="button"
+    class="copy-all-btn"
+    (click)="onCopyAll($event)"
+    title="Copiar"
+    aria-label="Copiar"
+  >
+    <span aria-hidden="true">⎘</span>
+  </button>
+
   <button
     *ngIf="showCollapseControls() && hasChildren()"
     type="button"

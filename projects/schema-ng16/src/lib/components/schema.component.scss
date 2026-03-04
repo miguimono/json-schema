@@ -103,6 +103,38 @@
   overscroll-behavior: contain;
   -webkit-user-select: none;
   user-select: none;
+  z-index: 1;
+}
+
+.stage-hitarea {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+  -ms-touch-action: none;
+  overscroll-behavior: contain;
+  -webkit-user-select: none;
+  user-select: none;
+  z-index: 0;
+}
+.stage.stage-text-select {
+  touch-action: auto;
+  -ms-touch-action: auto;
+}
+.stage-hitarea.stage-text-select {
+  touch-action: auto;
+  -ms-touch-action: auto;
+}
+.stage.stage-pan-enabled {
+  cursor: grab;
+}
+.stage-hitarea.stage-pan-enabled {
+  cursor: grab;
+}
+.stage.stage-pan-enabled.stage-dragging {
+  cursor: grabbing;
+}
+.stage-hitarea.stage-pan-enabled.stage-dragging {
+  cursor: grabbing;
 }
 
 .overlay {
