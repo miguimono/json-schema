@@ -216,6 +216,13 @@ export interface SchemaSettings {
     showColorFalse?: boolean;
     /** Habilita clase de color para valor `null`. */
     showColorNull?: boolean;
+
+    /** Color base para visuales de `true` (texto, borde y sombras derivadas). */
+    colorTrue?: string;
+    /** Color base para visuales de `false` (texto, borde y sombras derivadas). */
+    colorFalse?: string;
+    /** Color base para visuales de `null` (texto, borde y sombras derivadas). */
+    colorNull?: string;
   };
 
   /* -------------------------- Layout --------------------------- */
@@ -439,6 +446,9 @@ export const DEFAULT_SETTINGS: Required<SchemaSettings> = {
     showColorTrue: false,
     showColorFalse: false,
     showColorNull: false,
+    colorTrue: "#16a34a",
+    colorFalse: "#dc2626",
+    colorNull: "#6b7280",
   },
 
   layout: {

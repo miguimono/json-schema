@@ -56,6 +56,8 @@ import { CommonModule, NgTemplateOutlet } from "@angular/common";
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SchemaCardComponent {
+  private colorRgbaCache = new Map<string, string>();
+  private static colorParserCtx: CanvasRenderingContext2D | null | undefined;
   /* ============================ Inputs ============================ */
 
   /** Nodo a representar. Requerido. */
@@ -128,6 +130,9 @@ export class SchemaCardComponent {
     const reqTrue = s.colors?.showColorTrue ?? false;
     const reqFalse = s.colors?.showColorFalse ?? false;
     const reqNull = s.colors?.showColorNull ?? false;
+    const colorTrue = s.colors?.colorTrue ?? DEFAULT_SETTINGS.colors.colorTrue;
+    const colorFalse = s.colors?.colorFalse ?? DEFAULT_SETTINGS.colors.colorFalse;
+    const colorNull = s.colors?.colorNull ?? DEFAULT_SETTINGS.colors.colorNull;
 
     let showTrue = reqTrue;
     let showFalse = reqFalse;
@@ -170,6 +175,15 @@ export class SchemaCardComponent {
       showColorTrue: showTrue,
       showColorFalse: showFalse,
       showColorNull: showNull,
+      colorTrue,
+      colorFalse,
+      colorNull,
+      shadowTrue: this.buildShadow(colorTrue, 0.15),
+      shadowFalse: this.buildShadow(colorFalse, 0.15),
+      shadowNull: this.buildShadow(colorNull, 0.18),
+      fillTrue: this.toRgba(colorTrue, 0.1, "rgba(22, 163, 74, 0.1)"),
+      fillFalse: this.toRgba(colorFalse, 0.1, "rgba(220, 38, 38, 0.1)"),
+      fillNull: this.toRgba(colorNull, 0.12, "rgba(107, 114, 128, 0.12)"),
     };
   });
 
@@ -398,4 +412,88 @@ export class SchemaCardComponent {
     }
   }
 
+  private buildShadow(color: string | undefined, alpha: number): string {
+    const rgba = this.toRgba(color, alpha, `rgba(0, 0, 0, ${alpha})`);
+    return `0 2px 10px ${rgba}`;
+  }
+
+  private toRgba(color: string | undefined, alpha: number, fallback: string): string {
+    if (!color || typeof color !== "string") return fallback;
+    const c = color.trim();
+    if (!c) return fallback;
+
+    const key = `${c}|${alpha}`;
+    const cached = this.colorRgbaCache.get(key);
+    if (cached) return cached;
+
+    const rgb = this.parseCssColor(c);
+    if (!rgb) return fallback;
+
+    const out = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+    this.colorRgbaCache.set(key, out);
+    return out;
+  }
+
+  private parseCssColor(color: string): { r: number; g: number; b: number } | null {
+    const fromHex = this.parseHexColor(color);
+    if (fromHex) return fromHex;
+
+    const fromRgb = this.parseRgbColor(color);
+    if (fromRgb) return fromRgb;
+
+    const ctx = this.getColorParserCtx();
+    if (!ctx) return null;
+    ctx.fillStyle = "#000000";
+    ctx.fillStyle = color;
+    const normalized = String(ctx.fillStyle || "").trim();
+    return this.parseHexColor(normalized) ?? this.parseRgbColor(normalized);
+  }
+
+  private parseHexColor(color: string): { r: number; g: number; b: number } | null {
+    const hex = color.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    if (!hex) return null;
+    const h = hex[1];
+    const full =
+      h.length === 3
+        ? h
+            .split("")
+            .map((ch) => ch + ch)
+            .join("")
+        : h;
+    const n = parseInt(full, 16);
+    return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+  }
+
+  private parseRgbColor(color: string): { r: number; g: number; b: number } | null {
+    const rgb = color.match(/^rgba?\(([^)]+)\)$/i);
+    if (!rgb) return null;
+    const parts = rgb[1].split(",").map((p) => p.trim());
+    if (parts.length < 3) return null;
+    const r = Number(parts[0]);
+    const g = Number(parts[1]);
+    const b = Number(parts[2]);
+    if (![r, g, b].every((v) => Number.isFinite(v))) return null;
+    return {
+      r: Math.max(0, Math.min(255, Math.round(r))),
+      g: Math.max(0, Math.min(255, Math.round(g))),
+      b: Math.max(0, Math.min(255, Math.round(b))),
+    };
+  }
+
+  private getColorParserCtx(): CanvasRenderingContext2D | null {
+    if (SchemaCardComponent.colorParserCtx !== undefined) {
+      return SchemaCardComponent.colorParserCtx;
+    }
+    try {
+      if (typeof document === "undefined") {
+        SchemaCardComponent.colorParserCtx = null;
+      } else {
+        const canvas = document.createElement("canvas");
+        SchemaCardComponent.colorParserCtx = canvas.getContext("2d");
+      }
+    } catch {
+      SchemaCardComponent.colorParserCtx = null;
+    }
+    return SchemaCardComponent.colorParserCtx;
+  }
 }

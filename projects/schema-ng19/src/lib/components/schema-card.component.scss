@@ -150,15 +150,15 @@
   cursor: text;
 }
 .v-true {
-  color: t.$color-true;
+  color: var(--accent-true, #{t.$color-true});
   font-weight: 700;
 }
 .v-false {
-  color: t.$color-false;
+  color: var(--accent-false, #{t.$color-false});
   font-weight: 700;
 }
 .v-null {
-  color: t.$color-null;
+  color: var(--accent-null, #{t.$color-null});
   font-weight: 700;
 }
 /* Badges de arrays */
@@ -184,23 +184,23 @@
 
 /* Clases de acento (borde y/o relleno) */
 .schema-card.accent-true {
-  border-color: t.$color-true;
-  box-shadow: t.$shadow-true;
+  border-color: var(--accent-true, #{t.$color-true});
+  box-shadow: var(--accent-shadow-true, #{t.$shadow-true});
 }
 .schema-card.accent-false {
-  border-color: t.$color-false;
-  box-shadow: t.$shadow-false;
+  border-color: var(--accent-false, #{t.$color-false});
+  box-shadow: var(--accent-shadow-false, #{t.$shadow-false});
 }
 .schema-card.accent-null {
-  border-color: t.$color-null;
-  box-shadow: t.$shadow-null;
+  border-color: var(--accent-null, #{t.$color-null});
+  box-shadow: var(--accent-shadow-null, #{t.$shadow-null});
 }
 .schema-card.accent-fill-true {
-  background: rgba(22, 163, 74, 0.1);
+  background: var(--accent-fill-true, rgba(22, 163, 74, 0.1));
 }
 .schema-card.accent-fill-false {
-  background: rgba(220, 38, 38, 0.1);
+  background: var(--accent-fill-false, rgba(220, 38, 38, 0.1));
 }
 .schema-card.accent-fill-null {
-  background: rgba(107, 114, 128, 0.12);
+  background: var(--accent-fill-null, rgba(107, 114, 128, 0.12));
 }

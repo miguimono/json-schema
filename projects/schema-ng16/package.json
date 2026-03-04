@@ -1,6 +1,6 @@
 {
   "name": "@miguimono/json-schema-ng16",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "private": true,
   "description": "Internal build entry for Angular 16 compatibility (subpath ./ng16).",
   "license": "SEE LICENSE IN ROOT",
